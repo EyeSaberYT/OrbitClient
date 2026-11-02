@@ -8,9 +8,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Items;
 
 /**
- * Wavey Capes: capes move like cloth (Orbit's own simulation, {@link com.orbitclient.cape.ClothCape}).
- * The settings and defaults match the WaveyCapes mod's, so it feels the same. If that mod is installed
- * too, this steps aside and lets it draw capes.
+ * Client-side cape motion profiles implemented independently in {@link com.orbitclient.cape.ClothCape}.
+ * If WaveyCapes is installed too, this module steps aside to avoid drawing the cape twice.
  */
 public class WaveyCapesModule extends Module {
 	private static final boolean WAVEYCAPES_INSTALLED = net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("waveycapes");
@@ -19,16 +18,18 @@ public class WaveyCapesModule extends Module {
 	public static Identifier testCape;
 
 	private final ModeSetting style;
+	private final ModeSetting physics;
 	private final ModeSetting wind;
 	private final NumberSetting gravity;
 	private final NumberSetting heightMultiplier;
 	private final NumberSetting strafeMultiplier;
 
 	public WaveyCapesModule() {
-		super("Wavey Capes", "Capes move like cloth.", Category.MECHANIC);
+		super("Cape Physics", "Adds independent cloth motion to capes.", Category.MECHANIC);
 		setIcon(Items.ELYTRA);
 		instance = this;
 		style = add(new ModeSetting("Style", "Smooth", "Smooth", "Blocky"));
+		physics = add(new ModeSetting("Physics", "Dynamic", "Dynamic", "Pendulum", "Classic", "Dungeon Arc"));
 		wind = add(new ModeSetting("Wind", "None", "None", "Waves"));
 		gravity = add(new NumberSetting("Gravity", 25, 5, 50, 1));
 		heightMultiplier = add(new NumberSetting("Height Multiplier", 6, 2, 10, 1));
@@ -57,5 +58,49 @@ public class WaveyCapesModule extends Module {
 
 	public static float strafeMultiplier() {
 		return instance == null ? 2 : instance.strafeMultiplier.getFloat();
+	}
+
+	public static float damping() {
+		if (instance == null) return 0.94f;
+		if (instance.physics.is("Classic")) return 0.97f;
+		if (instance.physics.is("Pendulum")) return 0.90f;
+		if (instance.physics.is("Dungeon Arc")) return 0.92f;
+		return 0.94f;
+	}
+
+	public static float motionScale() {
+		if (instance == null) return 1f;
+		if (instance.physics.is("Classic")) return 0.48f;
+		if (instance.physics.is("Pendulum")) return 1.18f;
+		if (instance.physics.is("Dungeon Arc")) return 0.92f;
+		return 1f;
+	}
+
+	public static float lateralScale() {
+		if (instance == null) return 1f;
+		if (instance.physics.is("Classic")) return 0.28f;
+		if (instance.physics.is("Pendulum")) return 0.62f;
+		if (instance.physics.is("Dungeon Arc")) return 0.50f;
+		return 1f;
+	}
+
+	public static float rippleScale() {
+		if (instance == null) return 1f;
+		if (instance.physics.is("Classic")) return 0.2f;
+		if (instance.physics.is("Pendulum")) return 0f;
+		if (instance.physics.is("Dungeon Arc")) return 0.12f;
+		return 1f;
+	}
+
+	public static float gravityScale() {
+		if (instance == null) return 1f;
+		if (instance.physics.is("Classic")) return 0.65f;
+		if (instance.physics.is("Dungeon Arc")) return 0.82f;
+		if (instance.physics.is("Pendulum")) return 1.1f;
+		return 1f;
+	}
+
+	public static boolean dungeonArc() {
+		return instance != null && instance.physics.is("Dungeon Arc");
 	}
 }
