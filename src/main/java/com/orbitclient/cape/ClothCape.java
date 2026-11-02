@@ -109,17 +109,18 @@ public final class ClothCape {
 
 		// Out from the back. Air grows a bit faster than speed: walking lifts it about 38 degrees, sprinting 50.
 		float air = 10f * (float) Math.pow(Math.max(0, forward), 1.6);
-		if (!p.onGround()) air *= 0.3f; // mid-jump it trails rather than catching the wind
+		if (!p.onGround()) air *= 0.75f; // retain airflow in midair instead of collapsing to the back
 		// Thrown up high (a fall), it drops back quickly instead of floating down.
 		float weight = gravity * (1 + Math.max(0, swing - 0.9f) * 1.5f);
-		if (!p.onGround()) weight *= 2.5f; // in the air (a jump, a short drop) it sinks against the back
+		// Keep the same restoring force in the air. A large airborne multiplier pins the cape
+		// against the player's back just when they jump.
 		// Leaning forward (crouching) tilts world-down toward the back, so it drapes along it.
 		float lean = p.isCrouching() ? 0.5f : 0f;
 		float torque = air * (float) Math.cos(swing) - weight * (float) Math.sin(swing + lean);
 		swingSpeed = swingSpeed * DAMPING + RESPONSE * torque;
-		// The body moving up or down drags the cloth behind it. Rising (a jump) slaps it down against the back;
-		// a slow fall doesn't lift it, but a fast one throws it up past the shoulders.
-		if (dy > 0) swingSpeed -= (float) dy * 3f * height;
+		// On takeoff the body accelerates upward beneath the cloth, so the hem lags outward.
+		// A fast fall also catches air and lifts the cape; a slow fall doesn't.
+		if (dy > 0) swingSpeed += (float) dy * 2f * height;
 		else swingSpeed += 12f * (float) Math.pow(Math.max(0, -dy - 0.2), 1.5) * height;
 		// Landing (the fall stopping short) carries the cloth on down against the back too.
 		if (dy > lastDy && lastDy < 0) swingSpeed -= (float) (Math.min(dy, 0) - lastDy) * 3f * height;
