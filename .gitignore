@@ -51,3 +51,8 @@ run.log
 run.err
 gametest.log
 
+
+# per-version build output and logs
+/versions/*/build/
+*.log
+

@@ -1,8 +1,12 @@
 plugins {
-	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+	// Picks fabric-loom-remap (obfuscated, before 26.1) or fabric-loom (unobfuscated, 26.1+) per version.
+	id 'dev.kikugie.loom-back-compat'
 }
 
-version = project.mod_version
+def mc = stonecutter.current.version
+def unobfuscated = stonecutter.current.parsed.matches('>=26.1')
+
+version = "${project.mod_version}+${mc}"
 group = project.maven_group
 
 base {
@@ -10,10 +14,10 @@ base {
 }
 
 dependencies {
-	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings loom.officialMojangMappings()
+	minecraft "com.mojang:minecraft:${mc}"
+	loomx.applyMojangMappings()
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.property('deps.fabric_api')}"
 }
 
 // Client game tests: `gradlew runClientGameTest` opens a world and screenshots the menus (run/screenshots).
@@ -26,20 +30,30 @@ fabricApi {
 	}
 }
 
-processResources {
-	def version = project.version
-	inputs.property "version", version
-
-	filesMatching("fabric.mod.json") {
-		expand "version": version
+// Names that changed between versions, rewritten in the sources for the version being built.
+stonecutter {
+	replacements.string(unobfuscated) {
+		replace 'GuiGraphics', 'GuiGraphicsExtractor'
+		replace 'com.mojang.blaze3d.pipeline.RenderPipeline', 'com.mojang.renderpearl.api.pipeline.RenderPipeline'
+		replace 'net.minecraft.client.renderer.state.CameraRenderState', 'net.minecraft.client.renderer.state.level.CameraRenderState'
 	}
 }
 
+processResources {
+	def props = [version: project.version, minecraft: project.property('deps.minecraft_range')]
+	inputs.properties props
+	filesMatching("fabric.mod.json") {
+		expand props
+	}
+}
+
+// 26.x needs Java 25; 1.21.x runs on Java 21.
+def javaVersion = unobfuscated ? 25 : 21
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 21
+	it.options.release = javaVersion
 }
 
 java {
-	sourceCompatibility = JavaVersion.VERSION_21
-	targetCompatibility = JavaVersion.VERSION_21
+	sourceCompatibility = JavaVersion.toVersion(javaVersion)
+	targetCompatibility = JavaVersion.toVersion(javaVersion)
 }
