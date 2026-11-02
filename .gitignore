@@ -43,10 +43,10 @@ replay_*.log
 .jdk/
 
 # not part of the Orbit Client repo
-.rename-backup/
-.openchamber/
-server/
-utility-client/
+/.rename-backup/
+/.openchamber/
+/server/
+/utility-client/
 run.log
 run.err
 gametest.log
