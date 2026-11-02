@@ -20,6 +20,8 @@ public final class ClothCape {
 	private static final float HEIGHT = 1f;
 	private static final float REST_Z = 0.035f;
 	private static final int SOLVER_PASSES = 9;
+	/** Fastest a cloth point may move per tick, in blocks: keeps one bad tick from tearing the mesh. */
+	private static final float MAX_SPEED = 0.15f;
 	private static final int FORGET_AFTER = 60;
 	private static final Map<Integer, ClothCape> CAPES = new HashMap<>();
 
@@ -30,7 +32,6 @@ public final class ClothCape {
 	private int age;
 	private int lastDrawn;
 	private double lastPosX, lastPosY, lastPosZ;
-	private double lastDy;
 	private float lastBodyYaw;
 	private boolean hasLast;
 
@@ -90,32 +91,40 @@ public final class ClothCape {
 		if (dx * dx + dy * dy + dz * dz > 4) {
 			dx = dy = dz = 0;
 			turn = 0;
-			lastDy = 0;
 			System.arraycopy(positions, 0, previous, 0, positions.length);
 			firstStep = true;
 		}
 
 		if (firstStep) return;
-		double yaw = Math.toRadians(player.yBodyRot);
-		float forward = (float) (-dx * Math.sin(yaw) + dz * Math.cos(yaw));
-		float sideways = (float) (dx * Math.cos(yaw) + dz * Math.sin(yaw));
-		float gravity = WaveyCapesModule.gravity() / 25f;
+		float gravity = WaveyCapesModule.gravity() / 25f * WaveyCapesModule.gravityScale();
 		float height = WaveyCapesModule.heightMultiplier() / 6f;
 		float strafe = WaveyCapesModule.strafeMultiplier() / 2f;
-		float motionScale = WaveyCapesModule.motionScale();
-		float lateralScale = WaveyCapesModule.lateralScale();
 		float damping = WaveyCapesModule.damping();
 		if (player.isInWater()) gravity *= 0.3f;
-		float windZ = Mth.clamp(forward * 0.14f, -0.10f, 0.16f) * motionScale;
-		float windX = Mth.clamp(-sideways * 0.12f * strafe - turn * 0.16f, -0.10f, 0.10f) * lateralScale;
-		// Relative vertical drift makes the hem trail the player through the jump arc; the
-		// acceleration term gives the launch and landing a sharper response without teleporting
-		// the cloth or letting individual rows collapse together.
-		float verticalInertia = (float) Mth.clamp(dy * 0.16 + (dy - lastDy) * 0.06, -0.05, 0.05)
-			* height * motionScale;
-		lastDy = dy;
+
+		// The cloth lives in the body frame, but its momentum belongs to the world: carry each
+		// point's previous position into this tick's frame, so the cape trails behind when the
+		// shoulders move or turn. Each axis of the move is scaled by its setting; the vertical
+		// share is kept small so a jump lifts the hem without flinging it over the head.
+		double yaw = Math.toRadians(player.yBodyRot);
+		float cos = (float) Math.cos(yaw), sin = (float) Math.sin(yaw);
+		float moveX = (float) (dx * cos + dz * sin) * 0.4f * strafe * WaveyCapesModule.lateralScale();
+		float moveY = (float) Mth.clamp(-dy, -0.4, 0.4) * 0.15f * height;
+		float moveZ = (float) (dx * sin - dz * cos) * 0.4f * WaveyCapesModule.motionScale();
+		// A body snap (teleport, fast flick) would otherwise fling the cloth sideways.
+		turn = Mth.clamp(turn, -0.3f, 0.3f);
+		float turnCos = (float) Math.cos(turn), turnSin = (float) Math.sin(turn);
+		// The frame origin sits 2/16 behind the body's turning axis.
+		float pivot = 2f / 16f;
+		for (int i = COLUMNS * 3; i < previous.length; i += 3) {
+			float px = previous[i], pz = previous[i + 2] + pivot;
+			previous[i] = px * turnCos - pz * turnSin - moveX;
+			previous[i + 1] -= moveY;
+			previous[i + 2] = px * turnSin + pz * turnCos - pivot - moveZ;
+		}
+
 		float speed = (float) Math.sqrt(dx * dx + dz * dz);
-		float wave = ((WaveyCapesModule.windWaves() ? 0.008f : 0.002f) + Math.min(speed, 0.35f) * 0.018f)
+		float wave = ((WaveyCapesModule.windWaves() ? 0.006f : 0.0015f) + Math.min(speed, 0.35f) * 0.012f)
 			* WaveyCapesModule.rippleScale();
 
 		for (int row = 1; row < ROWS; row++) {
@@ -126,23 +135,29 @@ public final class ClothCape {
 				float vx = (x - previous[i]) * damping;
 				float vy = (y - previous[i + 1]) * damping;
 				float vz = (z - previous[i + 2]) * damping;
+				float v = (float) Math.sqrt(vx * vx + vy * vy + vz * vz);
+				if (v > MAX_SPEED) {
+					vx *= MAX_SPEED / v;
+					vy *= MAX_SPEED / v;
+					vz *= MAX_SPEED / v;
+				}
 				previous[i] = x;
 				previous[i + 1] = y;
 				previous[i + 2] = z;
 				float phase = age * 0.27f + row * 0.48f + column * 0.72f + player.getId() * 7.3f;
 				float edgeWave = wave * (float) Math.sin(phase) * depth;
-				positions[i] = x + vx + windX * depth;
-				positions[i + 1] = y + vy + (0.018f * gravity * WaveyCapesModule.gravityScale() + verticalInertia) * depth;
+				positions[i] = x + vx;
+				positions[i + 1] = y + vy + 0.018f * gravity;
 				float arcTarget = WaveyCapesModule.dungeonArc() ? 0.12f * depth * depth : 0f;
 				float arcRestoring = WaveyCapesModule.dungeonArc() ? (REST_Z + arcTarget - z) * 0.045f : 0f;
-				positions[i + 2] = z + vz + (windZ + edgeWave) * depth + arcRestoring;
+				positions[i + 2] = z + vz + edgeWave + arcRestoring;
 			}
 		}
 
 		float dxRest = WIDTH / (COLUMNS - 1);
 		float dyRest = HEIGHT / (ROWS - 1);
 		float diagonal = (float) Math.sqrt(dxRest * dxRest + dyRest * dyRest);
-		float verticalBend = dyRest * 2f;
+		float verticalBend = dyRest * 1.8f;
 		for (int pass = 0; pass < SOLVER_PASSES; pass++) {
 			pinTop();
 			for (int row = 0; row < ROWS - 1; row++) {
@@ -160,9 +175,11 @@ public final class ClothCape {
 					constrain(index(column - 1, row), index(column + 1, row), dxRest * 2);
 				}
 			}
+			// Rows may bend, but not crease: two rows apart may never come closer than this.
 			for (int row = 1; row < ROWS - 1; row++) {
 				for (int column = 0; column < COLUMNS; column++) {
-					constrain(index(column, row - 1), index(column, row + 1), verticalBend);
+					int a = index(column, row - 1), b = index(column, row + 1);
+					if (distance(a, b) < verticalBend) constrain(a, b, verticalBend);
 				}
 			}
 			collideWithBack();
@@ -206,8 +223,18 @@ public final class ClothCape {
 				// Keep the fabric behind the avatar without imposing a preferred left-to-right or
 				// top-to-bottom ordering: either ordering distorts folds and makes jumps look torn.
 				if (positions[i + 2] < 0.018f) positions[i + 2] = 0.018f;
+				// Never above the shoulders, so it can't flip over the head while falling.
+				if (positions[i + 1] < -0.08f) positions[i + 1] = -0.08f;
+				if (positions[i + 1] < 0 && positions[i + 2] < 0.14f) positions[i + 2] = 0.14f;
 			}
 		}
+	}
+
+	private float distance(int a, int b) {
+		float dx = positions[b] - positions[a];
+		float dy = positions[b + 1] - positions[a + 1];
+		float dz = positions[b + 2] - positions[a + 2];
+		return (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
 	}
 
 	private static int index(int column, int row) {
