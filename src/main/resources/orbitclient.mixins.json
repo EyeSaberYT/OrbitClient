@@ -1,0 +1,41 @@
+{
+	"required": true,
+	"package": "com.orbitclient.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"AbstractClientPlayerMixin",
+		"AbstractContainerScreenMixin",
+		"BrandingMixins",
+		"BiomeManagerAccessor",
+		"CameraMixin",
+		"CapeLayerMixin",
+		"ChatComponentAccessor",
+		"ChatComponentMixin",
+		"ChatScreenMixin",
+		"EntityMixin",
+		"EntityRendererMixin",
+		"FoodDataAccessor",
+		"GameRendererMixin",
+		"GuiMixin",
+		"ItemEntityRendererMixin",
+		"ItemStackMixin",
+		"LevelRendererMixin",
+		"LivingEntityRendererMixin",
+		"LevelMixin",
+		"MinecraftMixin",
+		"MouseHandlerMixin",
+		"MultiPlayerGameModeMixin",
+		"OptionInstanceMixin",
+		"OverlayTextureAccessor",
+		"PlayerNameMixin",
+		"PlayerTabOverlayMixin",
+		"ScreenEffectRendererMixin",
+		"ScreenInvoker",
+		"ScreenshotMixin",
+		"SoundEngineMixin",
+		"WindowTitleMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

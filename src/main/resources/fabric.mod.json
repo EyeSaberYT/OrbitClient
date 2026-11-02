@@ -1,0 +1,21 @@
+{
+	"schemaVersion": 1,
+	"id": "orbitclient",
+	"version": "${version}",
+	"name": "Orbit Client",
+	"description": "A PvP client mod with a Lunar-style mod menu, HUD editor and quality-of-life mods.",
+	"authors": ["EyeSaber"],
+	"license": "MIT",
+	"icon": "assets/orbitclient/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["com.orbitclient.OrbitClient"]
+	},
+	"mixins": ["orbitclient.mixins.json"],
+	"depends": {
+		"fabricloader": ">=0.18.1",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
