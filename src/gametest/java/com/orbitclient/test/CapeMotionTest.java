@@ -86,9 +86,12 @@ public class CapeMotionTest implements FabricClientGameTest {
 			sideView = true;
 			context.waitTicks(20);
 			move(context, server, -0.28, 0, 10);
-			server.runCommand("tp @p ~ ~0.6 ~");
-			move(context, server, -0.28, 0, 4);
-			context.takeScreenshot("cape-13-sprint-jump");
+			jumpArc(context, server, new double[]{0.30, 0.25, 0.19, 0.12});
+			context.takeScreenshot("cape-13a-jump-rising");
+			jumpArc(context, server, new double[]{0.04, -0.08, -0.16, -0.22});
+			context.takeScreenshot("cape-13b-jump-falling");
+			jumpArc(context, server, new double[]{-0.18, -0.12, -0.08, -0.06});
+			context.takeScreenshot("cape-13c-jump-landed");
 			context.runOnClient(mc -> {
 				mc.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
 				mc.options.hideGui = false;
@@ -101,6 +104,14 @@ public class CapeMotionTest implements FabricClientGameTest {
 	private static void move(ClientGameTestContext context, net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext server, double dx, double dz, int ticks) {
 		for (int i = 0; i < ticks; i++) {
 			server.runCommand("execute as @p at @s run tp @s ~" + dx + " ~ ~" + dz);
+			context.waitTicks(1);
+		}
+	}
+
+	/** Server-driven per-tick vertical arc, avoiding a teleport jump or synthetic key packet. */
+	private static void jumpArc(ClientGameTestContext context, net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext server, double[] deltas) {
+		for (double dy : deltas) {
+			server.runCommand("execute as @p at @s run tp @s ~ ~" + dy + " ~");
 			context.waitTicks(1);
 		}
 	}
