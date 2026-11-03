@@ -61,6 +61,7 @@ public final class ModuleManager {
 		// Mechanic
 		register(DebugToggleModule.chunkBorders());
 		register(new CrosshairModule());
+		register(new DisplacementModule());
 		register(new FovChangerModule());
 		register(new FreelookModule());
 		register(new FullbrightModule());
@@ -94,7 +95,7 @@ public final class ModuleManager {
 		// Lunar's defaults for a fresh install; saved profiles override these.
 		for (Class<? extends Module> type : List.of(ArmorStatusModule.class, BossBarModule.class, CoordinatesModule.class,
 			DirectionModule.class, FreelookModule.class, PotionEffectsModule.class, ScoreboardModule.class,
-			ToggleSprintModule.class, WaypointsModule.class, ZoomModule.class)) {
+			ToggleSprintModule.class, WaypointsModule.class, ZoomModule.class, DisplacementModule.class)) {
 			get(type).setDefaultEnabled(true);
 		}
 		tabEditor.setDefaultEnabled(true);
