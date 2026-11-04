@@ -1,8 +1,8 @@
 package com.orbitclient.gui;
 
-import com.mojang.authlib.GameProfile;
 import com.orbitclient.OrbitClient;
 import com.orbitclient.account.LauncherAccounts;
+import com.orbitclient.social.Friends;
 import com.orbitclient.util.Anim;
 import com.orbitclient.util.Icons;
 import com.orbitclient.util.Render2D;
@@ -10,7 +10,6 @@ import com.orbitclient.util.Shapes;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.PlayerFaceRenderer;
 import net.minecraft.client.gui.screens.CreditsAndAttributionScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -23,7 +22,6 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.world.entity.player.PlayerSkin;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -32,8 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
 
 /**
  * Orbit's title screen, in the look of the Orbit menu: Minecraft's panorama under a dark veil and a
@@ -63,8 +59,6 @@ public final class OrbitHomeScreen extends TitleScreen {
 	private float dt, openProgress;
 	private String hoveredLabel;
 
-	/** Skins of accounts, kept across home screens so heads don't reload each time. */
-	private static final Map<UUID, Supplier<PlayerSkin>> HEADS = new HashMap<>();
 
 	// Account popup
 	private boolean popupOpen;
@@ -90,7 +84,6 @@ public final class OrbitHomeScreen extends TitleScreen {
 	/** Deliberately doesn't call TitleScreen.init (see the class comment). */
 	@Override
 	protected void init() {
-		HEADS.putIfAbsent(minecraft.getUser().getProfileId(), minecraft.getSkinManager().createLookup(minecraft.getGameProfile(), false));
 		shortcuts.clear();
 		shortcuts.add(new Shortcut("ui_mods", "Orbit Mods", Theme.CAT_HUD, () -> minecraft.setScreen(new OrbitScreen())));
 		shortcuts.add(new Shortcut("ui_wardrobe", "Wardrobe", Theme.CAT_SERVER, () -> minecraft.setScreen(new WardrobeScreen())));
@@ -161,6 +154,7 @@ public final class OrbitHomeScreen extends TitleScreen {
 			renderFooter(g, bx, by);
 			renderTooltip(g, bx, by);
 			renderAccount(g, mx, my);
+			renderFriendsChip(g, bx, by);
 			renderAccountPopup(g, mx, my);
 		} finally {
 			Render2D.alpha = 1f;
@@ -265,24 +259,30 @@ public final class OrbitHomeScreen extends TitleScreen {
 		float hov = anim("account", over || popupOpen, 16f);
 		Render2D.roundedRectBordered(g, chipX, chipY, chipW, chipH, 11, Render2D.lerpColor(Theme.GLASS, 0xF01A1F2C, hov),
 			Render2D.lerpColor(Theme.GLASS_BORDER, Theme.CAT_HUD, hov));
-		PlayerFaceRenderer.draw(g, head(minecraft.getUser().getProfileId(), name).get(), chipX + 5, chipY + 5, 12, Render2D.a(0xFFFFFFFF));
+		Heads.draw(g, minecraft.getUser().getProfileId(), name, chipX + 5, chipY + 5, 12, Render2D.a(0xFFFFFFFF));
 		UiText.text(g, name, chipX + 22, chipY + 7, 0xFFFFFFFF);
 		UiText.text(g, "SWITCH", chipX + chipW - 8 - font.width("SWITCH"), chipY + 7, Render2D.lerpColor(Theme.O_TEXT_FAINT, Theme.CAT_HUD, hov));
 	}
 
-	/** A player head; the default skin until the real one has been fetched from Mojang. */
-	private Supplier<PlayerSkin> head(UUID uuid, String name) {
-		Supplier<PlayerSkin> known = HEADS.get(uuid);
-		if (known != null) return known;
-		Supplier<PlayerSkin> fallback = minecraft.getSkinManager().createLookup(new GameProfile(uuid, name), false);
-		HEADS.put(uuid, fallback);
-		var mc = minecraft;
-		CompletableFuture.supplyAsync(() -> mc.services().sessionService().fetchProfile(uuid, false))
-			.thenAccept(result -> {
-				if (result != null) mc.execute(() -> HEADS.put(uuid, mc.getSkinManager().createLookup(result.profile(), false)));
-			})
-			.exceptionally(e -> null);
-		return fallback;
+	/** Friends, left of the account chip: how many are online, and a red count of unread messages and requests. */
+	private void renderFriendsChip(GuiGraphics g, int mx, int my) {
+		long online = Friends.onlineCount();
+		String label = "FRIENDS", count = online > 0 ? online + " online" : "";
+		int h = chipH, w = 18 + font.width(label) + (count.isEmpty() ? 0 : 6 + font.width(count)) + 10;
+		int x = chipX - w - 6, y = chipY;
+		float hov = anim("friends", hit(mx, my, x, y, w, h, () -> minecraft.setScreen(new FriendsScreen())), 16f);
+		Render2D.roundedRectBordered(g, x, y, w, h, 11, Render2D.lerpColor(Theme.GLASS, 0xF01A1F2C, hov),
+			Render2D.lerpColor(Theme.GLASS_BORDER, Theme.ON, hov));
+		Shapes.disc(g, x + 10, y + h / 2f, 3, online > 0 ? Theme.ON : Theme.OFF);
+		UiText.text(g, label, x + 18, y + 7, 0xFFFFFFFF);
+		if (!count.isEmpty()) UiText.text(g, count, x + 24 + font.width(label), y + 7, Theme.ON);
+		int alerts = Friends.totalUnread() + Friends.incoming().size();
+		if (alerts > 0) {
+			String n = alerts > 9 ? "9+" : String.valueOf(alerts);
+			float r = Math.max(5, font.width(n) / 2f + 3);
+			Shapes.disc(g, x + w - 2, y + 2, r, Theme.DISABLED);
+			UiText.text(g, n, Math.round(x + w - 2 - font.width(n) / 2f), y - 2, 0xFFFFFFFF);
+		}
 	}
 
 	// ---------------------------------------------------------------- account popup
@@ -355,7 +355,7 @@ public final class OrbitHomeScreen extends TitleScreen {
 				float hov = anim("acc" + a.uuid(), over || busy, 18f);
 				if (hov > 0.01f) Render2D.roundedRect(g, rx, y, rw, rowH - 2, 6, Render2D.withAlpha(Theme.O_ROW_HOVER, hov));
 				if (active) Render2D.roundedRect(g, rx + 2, y + 6, 2, rowH - 14, 1, Theme.ON);
-				PlayerFaceRenderer.draw(g, head(a.uuid(), a.name()).get(), rx + 8, y + 3, 16, Render2D.a(0xFFFFFFFF));
+				Heads.draw(g, a.uuid(), a.name(), rx + 8, y + 3, 16, Render2D.a(0xFFFFFFFF));
 				UiText.fit(g, a.name(), rx + 30, y + 7, rw - 30 - 52, active ? 0xFFFFFFFF : Theme.O_TEXT);
 				String tag = active ? "ACTIVE" : busy ? ".".repeat(1 + (int) (System.currentTimeMillis() / 300 % 3)) : "SWITCH";
 				int tagColor = active ? Theme.ON : busy ? Theme.CAT_HUD : Render2D.withAlpha(Theme.CAT_HUD, hov);

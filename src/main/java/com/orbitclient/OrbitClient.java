@@ -63,6 +63,7 @@ public class OrbitClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			com.orbitclient.cosmetics.CosmeticManager.tickTrails();
 			com.orbitclient.cosmetics.CosmeticSync.tick();
+			com.orbitclient.social.Friends.tick();
 			com.orbitclient.cape.ClothCape.tickAll(client);
 		});
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {

@@ -20,6 +20,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class OrbitBadge {
 	private static final FontDescription FONT = new FontDescription.Resource(Identifier.fromNamespaceAndPath(OrbitClient.MOD_ID, "badge"));
 	private static final Component BADGE = Component.literal("✦").withStyle(s -> s.withColor(0x8C7BFF));
+	/** Friends get a green badge (friends always use Orbit Client: they're on its friends server). */
+	private static final Component FRIEND_BADGE = Component.literal("✦").withStyle(s -> s.withColor(0x3FD07A));
 	private static final Set<UUID> USERS = ConcurrentHashMap.newKeySet();
 
 	private OrbitBadge() {
@@ -36,8 +38,10 @@ public final class OrbitBadge {
 
 	/** The name with the badge in front, if that player uses Orbit Client and badges are on. */
 	public static Component decorate(UUID uuid, Component name) {
-		if (name == null || uuid == null || !ClientSettings.INSTANCE.orbitBadges.isOn() || !isUser(uuid)) return name;
-		MutableComponent out = Component.empty().append(BADGE).append(" ").append(name);
+		if (name == null || uuid == null || !ClientSettings.INSTANCE.orbitBadges.isOn()) return name;
+		boolean friend = ClientSettings.INSTANCE.friendBadges.isOn() && com.orbitclient.social.Friends.isFriend(uuid);
+		if (!friend && !isUser(uuid)) return name;
+		MutableComponent out = Component.empty().append(friend ? FRIEND_BADGE : BADGE).append(" ").append(name);
 		return out;
 	}
 }

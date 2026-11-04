@@ -38,6 +38,8 @@ public final class CosmeticSync {
 
 	private static volatile String token;
 	private static volatile String tokenServer;
+	/** The account the token was issued to: switching accounts in-game needs a new one. */
+	private static volatile UUID tokenUser;
 	private static volatile String status = "";
 	private static volatile boolean uploadPending;
 	private static long uploadAt;
@@ -76,7 +78,8 @@ public final class CosmeticSync {
 		return status;
 	}
 
-	private static String server() {
+	/** The cosmetics (and friends) server's address, or null while it isn't known. */
+	public static String server() {
 		if (testServer != null) return testServer;
 		long now = System.currentTimeMillis();
 		if (!resolving && now - resolvedAt > (resolved == null ? 60_000 : RESOLVE_MS)) {
@@ -118,9 +121,8 @@ public final class CosmeticSync {
 		Minecraft mc = Minecraft.getInstance();
 		String server = server();
 		if (server == null || mc.level == null || mc.player == null || busy) return;
-		if (!server.equals(tokenServer)) {
-			token = null;
-			tokenServer = server;
+		if (!server.equals(tokenServer) || !mc.getUser().getProfileId().equals(tokenUser)) {
+			// Another server or another account (switched in-game): sign in again and upload this account's loadout.
 			uploadedOnce = false;
 			FETCHED.clear();
 		}
@@ -163,6 +165,27 @@ public final class CosmeticSync {
 		return URI.create(server).getHost();
 	}
 
+	/**
+	 * A sign-in token for the current account on this server, signing in first when there's none
+	 * (or it was issued to another account or server). Null when signing in failed. Blocks: call it
+	 * off the game thread. Shared with the friends service.
+	 */
+	public static synchronized String token(String server) throws Exception {
+		UUID user = Minecraft.getInstance().getUser().getProfileId();
+		if (!server.equals(tokenServer) || !user.equals(tokenUser)) {
+			token = null;
+			tokenServer = server;
+			tokenUser = user;
+		}
+		if (token == null && !signIn(server)) return null;
+		return token;
+	}
+
+	/** The server answered 401 with this token: the next {@link #token} signs in again. */
+	public static synchronized void invalidate(String rejected) {
+		if (rejected != null && rejected.equals(token)) token = null;
+	}
+
 	/** Signs in: a one-time challenge, joinServer with Mojang, then the server checks it. */
 	private static boolean signIn(String server) throws Exception {
 		Minecraft mc = Minecraft.getInstance();
@@ -192,14 +215,14 @@ public final class CosmeticSync {
 
 	private static void upload(String server, String body) {
 		try {
-			if (token == null && !signIn(server)) return;
 			for (int attempt = 0; attempt < 2; attempt++) {
+				String t = token(server);
+				if (t == null) return;
 				HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/loadout")).timeout(Duration.ofSeconds(8))
-					.header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
+					.header("Authorization", "Bearer " + t).header("Content-Type", "application/json")
 					.PUT(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
 				if (r.statusCode() == 401 && attempt == 0) {
-					token = null;
-					if (!signIn(server)) return;
+					invalidate(t);
 					continue;
 				}
 				status = r.statusCode() == 200 ? "Synced: other Orbit Client players see your cosmetics"
@@ -222,16 +245,14 @@ public final class CosmeticSync {
 				HttpResponse.BodyHandlers.ofString());
 			if (r.statusCode() != 200) return;
 			JsonObject all = JsonParser.parseString(r.body()).getAsJsonObject();
-			HttpResponse<String> users = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/users?uuids=" + q)).timeout(Duration.ofSeconds(8)).GET().build(),
-				HttpResponse.BodyHandlers.ofString());
-			if (users.statusCode() == 200) {
-				for (var id : JsonParser.parseString(users.body()).getAsJsonObject().getAsJsonArray("users")) {
-					try { OrbitBadge.markUser(UUID.fromString(id.getAsString())); } catch (IllegalArgumentException ignored) { }
-				}
-			}
 			Minecraft mc = Minecraft.getInstance();
 			for (UUID u : uuids) {
-				var loadout = CosmeticManager.Loadout.fromJson(all.get(u.toString()));
+				var data = all.get(u.toString());
+				// The cosmetics service exposes known Orbit users through /loadouts; there is no
+				// /users route. A returned loadout (even an empty one) is the server-backed
+				// confirmation that this UUID has connected with Orbit Client.
+				if (data != null && !data.isJsonNull()) OrbitBadge.markUser(u);
+				var loadout = CosmeticManager.Loadout.fromJson(data);
 				mc.execute(() -> CosmeticManager.setOther(u, loadout));
 			}
 		} catch (Exception e) {

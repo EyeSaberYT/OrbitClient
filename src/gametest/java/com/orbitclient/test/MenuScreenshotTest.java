@@ -56,6 +56,36 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 		context.takeScreenshot("orbit-00-home-accounts");
 		context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 		context.waitTicks(5);
+		// Friends: sample data as the server would send it (the test account can't sign in).
+		java.util.UUID alex = java.util.UUID.fromString("853c80ef-3c37-49fd-aa49-938b674adae6");
+		java.util.UUID steve = java.util.UUID.fromString("069a79f4-44e9-4726-a5be-fca90e38aaf5");
+		context.runOnClient(mc -> {
+			String me = mc.getUser().getProfileId().toString();
+			long now = System.currentTimeMillis();
+			com.orbitclient.social.Friends.loadForTest(com.google.gson.JsonParser.parseString("""
+				{"friends":[
+				  {"uuid":"%s","name":"jeb_","online":true,"server":"farms.minearcade.org"},
+				  {"uuid":"%s","name":"Notch","online":true,"server":"singleplayer"},
+				  {"uuid":"61699b2e-d327-4a01-9f1e-0ea8c3f06bc6","name":"Dinnerbone","online":false,"server":""}],
+				 "incoming":[{"uuid":"0d7df8b4-5d6a-4c23-8a9c-ff9e1b6b4b8f","name":"Grumm"}],
+				 "outgoing":[], "blocked":[],
+				 "messages":[
+				  {"id":1,"from":"%s","to":"%s","text":"you on the farms server?","time":%d},
+				  {"id":2,"from":"%s","to":"%s","text":"yeah, come join! bring a few stacks of bonemeal, the wheat farm is almost done","time":%d}],
+				 "lastMessage":2}
+				""".formatted(alex, steve, me, alex, now - 120000, alex, me, now - 60000)).getAsJsonObject());
+		});
+		context.setScreen(com.orbitclient.gui.OrbitHomeScreen::new);
+		context.waitTicks(15);
+		context.takeScreenshot("orbit-00-home-friends");
+		context.setScreen(com.orbitclient.gui.FriendsScreen::new);
+		context.waitTicks(10);
+		context.takeScreenshot("orbit-00-friends-list");
+		context.setScreen(() -> new com.orbitclient.gui.FriendsScreen(alex));
+		context.waitTicks(10);
+		context.takeScreenshot("orbit-00-friends-chat");
+		context.setScreen(() -> null);
+		context.waitTicks(5);
 		// Closing a screen outside a world comes back to the Orbit home screen, not the vanilla one.
 		context.setScreen(OrbitScreen::new);
 		context.waitTicks(5);

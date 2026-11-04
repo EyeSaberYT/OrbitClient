@@ -20,6 +20,10 @@ public final class ClientSettings extends Module {
 	public final BooleanSetting copyChat;
 	public final BooleanSetting showOthersCosmetics;
 	public final BooleanSetting orbitBadges;
+	public final BooleanSetting friendsOnline;
+	public final BooleanSetting shareServer;
+	public final BooleanSetting friendNotifications;
+	public final BooleanSetting friendBadges;
 	public final BooleanSetting smoothHotbar;
 	/** Snap HUD mod scales so text never looks broken when made small. */
 	public final BooleanSetting pixelPerfectHud;
@@ -39,6 +43,10 @@ public final class ClientSettings extends Module {
 		copyChat = add(new BooleanSetting("Shift-Click to Copy Chat", true));
 		showOthersCosmetics = add(new BooleanSetting("Show Others' Cosmetics", true));
 		orbitBadges = add(new BooleanSetting("Show Orbit Badges", true));
+		friendsOnline = add(new BooleanSetting("Friends: Appear Online", true));
+		shareServer = add(new BooleanSetting("Friends: Show My Server", true).visibleWhen(friendsOnline::isOn));
+		friendNotifications = add(new BooleanSetting("Friends: Notifications", true));
+		friendBadges = add(new BooleanSetting("Friends: Green Badge For Friends", true));
 		smoothHotbar = add(new BooleanSetting("Smooth Hotbar Selector", true).visibleWhen(animations::isOn));
 		pixelPerfectHud = add(new BooleanSetting("Pixel-Perfect HUD Scaling", true));
 		iconStyle = add(new ModeSetting("Mod Icons", "Custom", "Custom", "Items"));
