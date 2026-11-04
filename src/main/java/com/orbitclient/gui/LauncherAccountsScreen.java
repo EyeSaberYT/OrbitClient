@@ -182,7 +182,7 @@ public final class LauncherAccountsScreen extends Screen {
 
 	@Override
 	public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-		renderBackground(graphics, mouseX, mouseY, partialTick);
+		// The background (and its blur) is already drawn before render(); drawing it again crashes.
 		graphics.drawCenteredString(font, title, width / 2, 24, 0xFFFFFFFF);
 		if (!status.isBlank()) graphics.drawCenteredString(font, Component.literal(status), width / 2, height / 2 + 75, 0xFFFFC66D);
 		super.render(graphics, mouseX, mouseY, partialTick);
