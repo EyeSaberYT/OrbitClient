@@ -26,7 +26,6 @@
 		"MouseHandlerMixin",
 		"MultiPlayerGameModeMixin",
 		"OptionInstanceMixin",
-		"TitleScreenMixin",
 		"OverlayTextureAccessor",
 		"PlayerNameMixin",
 		"PlayerTabOverlayMixin",

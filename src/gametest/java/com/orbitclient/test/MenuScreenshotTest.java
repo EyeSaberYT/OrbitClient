@@ -43,6 +43,11 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 	@Override
 	public void runTest(ClientGameTestContext context) {
 		context.getInput().resizeWindow(1600, 900);
+		context.waitTicks(40);
+		context.takeScreenshot("orbit-00-home");
+		context.getInput().setCursorPos(800, 470);
+		context.waitTicks(10);
+		context.takeScreenshot("orbit-00-home-hover");
 		try (TestSingleplayerContext sp = context.worldBuilder().create()) {
 			sp.getClientWorld().waitForChunksRender();
 			context.runOnClient(mc -> {
