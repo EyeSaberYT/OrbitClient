@@ -2,6 +2,7 @@ package com.orbitclient.module.visual;
 
 import com.orbitclient.module.Category;
 import com.orbitclient.module.Module;
+import com.orbitclient.setting.BooleanSetting;
 import com.orbitclient.setting.ColorSetting;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -11,6 +12,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 import java.io.InputStream;
@@ -25,7 +27,9 @@ public class GlintColorizerModule extends Module {
 		Identifier.withDefaultNamespace("textures/misc/enchanted_glint_item.png"),
 		Identifier.withDefaultNamespace("textures/misc/enchanted_glint_armor.png"),
 	};
+	private static GlintColorizerModule instance;
 	private final ColorSetting color;
+	private final BooleanSetting allItems;
 	private int applied;
 	private final AbstractTexture[] originals = new AbstractTexture[GLINTS.length];
 
@@ -41,6 +45,13 @@ public class GlintColorizerModule extends Module {
 		super("Glint Colorizer", "Changes the color of the enchantment glint.", Category.MECHANIC);
 		setIcon(Items.ENCHANTED_BOOK);
 		color = add(new ColorSetting("Color", 0xFFFF4D6D));
+		allItems = add(new BooleanSetting("All Items", false));
+		instance = this;
+	}
+
+	/** All Items: every item glints, enchanted or not (only on your screen). */
+	public static boolean glintAll(ItemStack stack) {
+		return instance != null && instance.isEnabled() && instance.allItems.isOn() && !stack.isEmpty();
 	}
 
 	@Override

@@ -1,6 +1,8 @@
 package com.orbitclient.gui;
 
+import com.mojang.authlib.GameProfile;
 import com.orbitclient.OrbitClient;
+import com.orbitclient.account.LauncherAccounts;
 import com.orbitclient.util.Anim;
 import com.orbitclient.util.Icons;
 import com.orbitclient.util.Render2D;
@@ -16,17 +18,21 @@ import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.SafetyScreen;
 import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.player.PlayerSkin;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 /**
@@ -54,9 +60,21 @@ public final class OrbitHomeScreen extends TitleScreen {
 	private final List<Hit> hits = new ArrayList<>();
 	private final float[][] stars = new float[90][4];
 	private final List<Shortcut> shortcuts = new ArrayList<>();
-	private Supplier<PlayerSkin> skin;
 	private float dt, openProgress;
 	private String hoveredLabel;
+
+	/** Skins of accounts, kept across home screens so heads don't reload each time. */
+	private static final Map<UUID, Supplier<PlayerSkin>> HEADS = new HashMap<>();
+
+	// Account popup
+	private boolean popupOpen;
+	private List<LauncherAccounts.Account> accounts = List.of();
+	private String accountError;
+	private LauncherAccounts.Account switching;
+	private String switchStatus;
+	private int switchStatusColor;
+	private final List<Hit> popupHits = new ArrayList<>();
+	private int chipX, chipY, chipW, chipH, popupX, popupY, popupW, popupH;
 
 	public OrbitHomeScreen() {
 		super();
@@ -72,7 +90,7 @@ public final class OrbitHomeScreen extends TitleScreen {
 	/** Deliberately doesn't call TitleScreen.init (see the class comment). */
 	@Override
 	protected void init() {
-		skin = minecraft.getSkinManager().createLookup(minecraft.getGameProfile(), false);
+		HEADS.putIfAbsent(minecraft.getUser().getProfileId(), minecraft.getSkinManager().createLookup(minecraft.getGameProfile(), false));
 		shortcuts.clear();
 		shortcuts.add(new Shortcut("ui_mods", "Orbit Mods", Theme.CAT_HUD, () -> minecraft.setScreen(new OrbitScreen())));
 		shortcuts.add(new Shortcut("ui_wardrobe", "Wardrobe", Theme.CAT_SERVER, () -> minecraft.setScreen(new WardrobeScreen())));
@@ -136,11 +154,14 @@ public final class OrbitHomeScreen extends TitleScreen {
 			int emblemY = Math.max(52, height / 2 - 92) + slide;
 			renderEmblem(g, width / 2, emblemY);
 			int top = emblemY + 58;
-			renderPlayButtons(g, mx, my, top);
-			renderShortcuts(g, mx, my, top + 70);
+			// While the account popup is open, the rest of the screen doesn't react to the mouse.
+			int bx = popupOpen ? -10000 : mx, by = popupOpen ? -10000 : my;
+			renderPlayButtons(g, bx, by, top);
+			renderShortcuts(g, bx, by, top + 70);
+			renderFooter(g, bx, by);
+			renderTooltip(g, bx, by);
 			renderAccount(g, mx, my);
-			renderFooter(g, mx, my);
-			renderTooltip(g, mx, my);
+			renderAccountPopup(g, mx, my);
 		} finally {
 			Render2D.alpha = 1f;
 		}
@@ -233,17 +254,124 @@ public final class OrbitHomeScreen extends TitleScreen {
 		}
 	}
 
-	/** Your account (head, name) in the top right; click to switch accounts. */
+	/** Your account (head, name) in the top right; click it for the account popup. */
 	private void renderAccount(GuiGraphics g, int mx, int my) {
 		String name = minecraft.getUser().getName();
-		int h = 22, w = 22 + font.width(name) + 8 + font.width("SWITCH") + 12;
-		int x = width - w - 10, y = 10;
-		float hov = anim("account", hit(mx, my, x, y, w, h, () -> minecraft.setScreen(new LauncherAccountsScreen(this))), 16f);
-		Render2D.roundedRectBordered(g, x, y, w, h, 11, Render2D.lerpColor(Theme.GLASS, 0xF01A1F2C, hov),
+		chipH = 22;
+		chipW = 22 + font.width(name) + 8 + font.width("SWITCH") + 12;
+		chipX = width - chipW - 10;
+		chipY = 10;
+		boolean over = Render2D.hovered(mx, my, chipX, chipY, chipW, chipH);
+		float hov = anim("account", over || popupOpen, 16f);
+		Render2D.roundedRectBordered(g, chipX, chipY, chipW, chipH, 11, Render2D.lerpColor(Theme.GLASS, 0xF01A1F2C, hov),
 			Render2D.lerpColor(Theme.GLASS_BORDER, Theme.CAT_HUD, hov));
-		PlayerFaceRenderer.draw(g, skin.get(), x + 5, y + 5, 12);
-		UiText.text(g, name, x + 22, y + 7, 0xFFFFFFFF);
-		UiText.text(g, "SWITCH", x + w - 8 - font.width("SWITCH"), y + 7, Render2D.lerpColor(Theme.O_TEXT_FAINT, Theme.CAT_HUD, hov));
+		PlayerFaceRenderer.draw(g, head(minecraft.getUser().getProfileId(), name).get(), chipX + 5, chipY + 5, 12, Render2D.a(0xFFFFFFFF));
+		UiText.text(g, name, chipX + 22, chipY + 7, 0xFFFFFFFF);
+		UiText.text(g, "SWITCH", chipX + chipW - 8 - font.width("SWITCH"), chipY + 7, Render2D.lerpColor(Theme.O_TEXT_FAINT, Theme.CAT_HUD, hov));
+	}
+
+	/** A player head; the default skin until the real one has been fetched from Mojang. */
+	private Supplier<PlayerSkin> head(UUID uuid, String name) {
+		Supplier<PlayerSkin> known = HEADS.get(uuid);
+		if (known != null) return known;
+		Supplier<PlayerSkin> fallback = minecraft.getSkinManager().createLookup(new GameProfile(uuid, name), false);
+		HEADS.put(uuid, fallback);
+		var mc = minecraft;
+		CompletableFuture.supplyAsync(() -> mc.services().sessionService().fetchProfile(uuid, false))
+			.thenAccept(result -> {
+				if (result != null) mc.execute(() -> HEADS.put(uuid, mc.getSkinManager().createLookup(result.profile(), false)));
+			})
+			.exceptionally(e -> null);
+		return fallback;
+	}
+
+	// ---------------------------------------------------------------- account popup
+
+	private void togglePopup() {
+		popupOpen = !popupOpen;
+		if (!popupOpen) return;
+		accountError = null;
+		try {
+			accounts = LauncherAccounts.load();
+			if (accounts.isEmpty()) accountError = "No accounts in Orbit Launcher yet";
+		} catch (Exception e) {
+			accounts = List.of();
+			accountError = "Couldn't read Orbit Launcher's accounts";
+		}
+	}
+
+	private void switchTo(LauncherAccounts.Account account) {
+		if (switching != null) return;
+		switching = account;
+		switchStatus = "Signing in as " + account.name() + "...";
+		switchStatusColor = Theme.O_TEXT_DIM;
+		LauncherAccounts.switchTo(account).whenComplete((ignored, error) -> minecraft.execute(() -> {
+			switching = null;
+			if (error != null) {
+				OrbitClient.LOGGER.warn("Couldn't switch to account {}: {}", account.name(), rootMessage(error));
+				switchStatus = "Couldn't sign in. Sign in again in Orbit Launcher.";
+				switchStatusColor = Theme.DISABLED;
+			} else {
+				switchStatus = "Signed in as " + account.name();
+				switchStatusColor = Theme.ON;
+			}
+		}));
+	}
+
+	private static String rootMessage(Throwable t) {
+		while (t.getCause() != null) t = t.getCause();
+		return t.getClass().getSimpleName() + (t.getMessage() == null ? "" : ": " + t.getMessage());
+	}
+
+	/** The account list under the chip, like Lunar's and Feather's: click an account to switch to it. */
+	private void renderAccountPopup(GuiGraphics g, int mx, int my) {
+		popupHits.clear();
+		float p = anim("popup", popupOpen, 14f);
+		if (p < 0.01f) return;
+		float base = Render2D.alpha;
+		Render2D.alpha = base * Anim.easeOutCubic(p);
+		try {
+			int rowH = 24, rows = Math.max(1, accounts.size());
+			popupW = Math.max(190, chipW);
+			popupX = width - popupW - 10;
+			popupY = chipY + chipH + 6 - Math.round((1 - p) * 6);
+			popupH = 22 + rows * rowH + 4 + (switchStatus != null ? 14 : 0) + 16;
+			Render2D.roundedRectBordered(g, popupX, popupY, popupW, popupH, 8, 0xF40E1017, Theme.GLASS_BORDER);
+			UiText.spacedSmall(g, "ACCOUNTS", popupX + popupW / 2f, popupY + 8, Theme.O_TEXT_DIM, true, 0.6f);
+			Render2D.fill(g, popupX + 8, popupY + 19, popupX + popupW - 8, popupY + 20, 0x20FFFFFF);
+
+			int y = popupY + 22;
+			if (accountError != null) {
+				UiText.centered(g, accountError, popupX + popupW / 2, y + 8, Theme.O_TEXT_FAINT);
+			}
+			UUID current = minecraft.getUser().getProfileId();
+			for (LauncherAccounts.Account a : accounts) {
+				int rx = popupX + 4, rw = popupW - 8;
+				boolean active = a.uuid().equals(current);
+				boolean busy = a == switching;
+				boolean clickable = popupOpen && !active && switching == null;
+				boolean over = clickable && Render2D.hovered(mx, my, rx, y, rw, rowH - 2);
+				if (clickable) popupHits.add(new Hit(rx, y, rw, rowH - 2, () -> switchTo(a)));
+				float hov = anim("acc" + a.uuid(), over || busy, 18f);
+				if (hov > 0.01f) Render2D.roundedRect(g, rx, y, rw, rowH - 2, 6, Render2D.withAlpha(Theme.O_ROW_HOVER, hov));
+				if (active) Render2D.roundedRect(g, rx + 2, y + 6, 2, rowH - 14, 1, Theme.ON);
+				PlayerFaceRenderer.draw(g, head(a.uuid(), a.name()).get(), rx + 8, y + 3, 16, Render2D.a(0xFFFFFFFF));
+				UiText.fit(g, a.name(), rx + 30, y + 7, rw - 30 - 52, active ? 0xFFFFFFFF : Theme.O_TEXT);
+				String tag = active ? "ACTIVE" : busy ? ".".repeat(1 + (int) (System.currentTimeMillis() / 300 % 3)) : "SWITCH";
+				int tagColor = active ? Theme.ON : busy ? Theme.CAT_HUD : Render2D.withAlpha(Theme.CAT_HUD, hov);
+				UiText.text(g, tag, rx + rw - 8 - font.width(tag), y + 7, tagColor);
+				y += rowH;
+			}
+			if (accounts.isEmpty()) y += rowH;
+			y += 4;
+			if (switchStatus != null) {
+				UiText.fit(g, switchStatus, popupX + 10, y, popupW - 20, switchStatusColor);
+				y += 14;
+			}
+			UiText.centered(g, "Add accounts in Orbit Launcher", popupX + popupW / 2, y + 1, Theme.O_TEXT_FAINT);
+		} finally {
+			Render2D.alpha = base;
+		}
 	}
 
 	private void renderFooter(GuiGraphics g, int mx, int my) {
@@ -268,15 +396,45 @@ public final class OrbitHomeScreen extends TitleScreen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		if (event.button() == 0) {
-			for (Hit h : hits) {
-				if (Render2D.hovered(event.x(), event.y(), h.x, h.y, h.w, h.h)) {
-					minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1f));
+		double mx = event.x(), my = event.y();
+		if (event.button() != 0) return super.mouseClicked(event, doubleClick);
+		if (Render2D.hovered(mx, my, chipX, chipY, chipW, chipH)) {
+			click();
+			togglePopup();
+			return true;
+		}
+		if (popupOpen) {
+			// The popup is modal: a click outside it only closes it.
+			for (Hit h : popupHits) {
+				if (Render2D.hovered(mx, my, h.x, h.y, h.w, h.h)) {
+					click();
 					h.action.run();
 					return true;
 				}
 			}
+			if (!Render2D.hovered(mx, my, popupX, popupY, popupW, popupH)) popupOpen = false;
+			return true;
+		}
+		for (Hit h : hits) {
+			if (Render2D.hovered(mx, my, h.x, h.y, h.w, h.h)) {
+				click();
+				h.action.run();
+				return true;
+			}
 		}
 		return super.mouseClicked(event, doubleClick);
+	}
+
+	@Override
+	public boolean keyPressed(KeyEvent event) {
+		if (popupOpen && event.key() == GLFW.GLFW_KEY_ESCAPE) {
+			popupOpen = false;
+			return true;
+		}
+		return super.keyPressed(event);
+	}
+
+	private void click() {
+		minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1f));
 	}
 }

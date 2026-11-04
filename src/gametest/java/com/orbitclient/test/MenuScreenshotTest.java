@@ -2,6 +2,7 @@ package com.orbitclient.test;
 
 import com.orbitclient.gui.CrosshairEditorScreen;
 import com.orbitclient.gui.HudEditorScreen;
+import com.orbitclient.gui.OrbitHomeScreen;
 import com.orbitclient.gui.OrbitScreen;
 import com.orbitclient.module.ModuleManager;
 import com.orbitclient.module.hud.CoordinatesModule;
@@ -48,6 +49,21 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 		context.getInput().setCursorPos(800, 470);
 		context.waitTicks(10);
 		context.takeScreenshot("orbit-00-home-hover");
+		// The account chip in the top right opens the account popup; Escape closes it.
+		context.getInput().setCursorPos(1400, 62);
+		context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		context.waitTicks(10);
+		context.takeScreenshot("orbit-00-home-accounts");
+		context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+		context.waitTicks(5);
+		// Closing a screen outside a world comes back to the Orbit home screen, not the vanilla one.
+		context.setScreen(OrbitScreen::new);
+		context.waitTicks(5);
+		context.setScreen(() -> null);
+		context.waitTicks(5);
+		context.runOnClient(mc -> {
+			if (!(mc.screen instanceof OrbitHomeScreen)) throw new AssertionError("Closing a screen showed " + mc.screen + ", not the Orbit home screen");
+		});
 		try (TestSingleplayerContext sp = context.worldBuilder().create()) {
 			sp.getClientWorld().waitForChunksRender();
 			context.runOnClient(mc -> {
@@ -241,6 +257,14 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 			sp.getServer().runCommand("damage @e[type=husk,limit=1] 1");
 			context.waitTicks(1);
 			context.takeScreenshot("orbit-13d-new-mods-world");
+			// Glint Colorizer's All Items: the unenchanted sword, gold and log glint too.
+			Runnable toggleAllItems = () -> context.runOnClient(mc -> ModuleManager.get(com.orbitclient.module.visual.GlintColorizerModule.class).getSettings().stream()
+				.filter(s -> s.getName().equals("All Items")).findFirst()
+				.ifPresent(s -> ((com.orbitclient.setting.BooleanSetting) s).toggle()));
+			toggleAllItems.run();
+			context.waitTicks(2);
+			context.takeScreenshot("orbit-13d2-glint-all-items");
+			toggleAllItems.run();
 			context.runOnClient(mc -> {
 				for (int i = 0; i < 3; i++) mc.gui.getChat().addMessage(net.minecraft.network.chat.Component.literal("Spam message"));
 				var chat = (com.orbitclient.mixin.ChatComponentAccessor) mc.gui.getChat();

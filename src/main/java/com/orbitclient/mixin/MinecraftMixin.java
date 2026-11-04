@@ -14,9 +14,14 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 @Mixin(Minecraft.class)
 public class MinecraftMixin {
-	/** Orbit's home screen replaces the vanilla title screen; every other screen is left alone. */
+	/**
+	 * Orbit's home screen replaces the vanilla title screen; every other screen is left alone. Closing a
+	 * screen outside a world is setScreen(null), which makes its own TitleScreen further down, so that
+	 * case is the home screen too.
+	 */
 	@ModifyVariable(method = "setScreen", at = @At("HEAD"), argsOnly = true)
 	private Screen orbit$homeScreen(Screen screen) {
+		if (screen == null && ((Minecraft) (Object) this).level == null) return new OrbitHomeScreen();
 		return screen instanceof TitleScreen && !(screen instanceof OrbitHomeScreen) ? new OrbitHomeScreen() : screen;
 	}
 
