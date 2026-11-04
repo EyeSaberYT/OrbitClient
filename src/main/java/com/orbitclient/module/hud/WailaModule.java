@@ -16,15 +16,31 @@ import net.minecraft.world.phys.HitResult;
 public class WailaModule extends HudModule {
 	private final BooleanSetting background;
 	private final BooleanSetting showEntities;
+	private final BooleanSetting centerHorizontally;
 	private final ColorSetting textColor;
 
 	public WailaModule() {
-		super("WAILA", "Shows what block or mob you are looking at.", 0.44, 0.01);
+		super("WAILA", "Shows what block or mob you are looking at.", 0.5, 0.01);
 		setIcon(Items.KNOWLEDGE_BOOK);
 		markNew();
 		background = add(new BooleanSetting("Background", true));
 		showEntities = add(new BooleanSetting("Show Mobs", true));
+		centerHorizontally = add(new BooleanSetting("Center Horizontally", true));
 		textColor = add(new ColorSetting("Text Color", 0xFFFFFFFF));
+	}
+
+	/** Center the whole label by its live width, so short and long player names stay aligned. */
+	@Override
+	public int getX(int screenWidth) {
+		if (!centerHorizontally.isOn()) return super.getX(screenWidth);
+		return Math.max(0, (screenWidth - getScaledWidth()) / 2);
+	}
+
+	/** A manual HUD-editor drag switches to custom placement so dragging still feels natural. */
+	@Override
+	public void setPosition(int x, int y, int screenWidth, int screenHeight) {
+		centerHorizontally.set(false);
+		super.setPosition(x, y, screenWidth, screenHeight);
 	}
 
 	/** {name, icon or null}, or null when looking at nothing. */

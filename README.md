@@ -90,7 +90,7 @@ You need **JDK 25** to run the build tools (the mod itself targets Java 21).
 .\gradlew.bat build
 ```
 
-The jar is written to `build/libs/orbit-client-1.0.7.jar`. Put it in `.minecraft/mods` together with
+The jar is written to `build/libs/orbit-client-1.0.8.jar`. Put it in `.minecraft/mods` together with
 [Fabric API](https://modrinth.com/mod/fabric-api) for 1.21.11, using Fabric Loader 0.18.1 or newer.
 
 - `.\gradlew.bat runClient` starts a dev client.
