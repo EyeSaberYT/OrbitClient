@@ -14,6 +14,7 @@ import com.orbitclient.util.Render2D;
 import com.orbitclient.util.Shapes;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -58,6 +59,11 @@ public class WardrobeScreen extends Screen {
 
 	private int cx, cy, coreR, slotR, ringR, nodeR, panelX, panelY, panelW, panelH;
 	private float ringAngle, ringTarget;
+	// When a slot has more cosmetics than fit around the ring, they slide around it as you scroll
+	// (scroll counts nodes); the ones entering and leaving fade at the bottom.
+	private boolean carousel;
+	private float scroll, scrollTarget;
+	private String search = "";
 	private float yaw = 200f;
 	private boolean dragging;
 	private long lastDrag;
@@ -130,7 +136,9 @@ public class WardrobeScreen extends Screen {
 			renderCore(g, eased);
 			renderTooltip(g, mx, my);
 			renderPanel(g, mx, my, eased);
-			UiText.spacedSmall(g, "SCROLL TO SPIN  •  DRAG YOURSELF TO TURN  •  ← → SWITCH SLOT", cx, height - 14, Theme.O_TEXT_FAINT, true, 0.55f);
+			renderSearch(g);
+			UiText.spacedSmall(g, (carousel ? "SCROLL TO BROWSE" : "SCROLL TO SPIN") + "  •  TYPE TO SEARCH  •  DRAG YOURSELF TO TURN  •  ← → SWITCH SLOT",
+				cx, height - 14, Theme.O_TEXT_FAINT, true, 0.55f);
 		} finally {
 			Render2D.alpha = 1f;
 		}
@@ -177,10 +185,29 @@ public class WardrobeScreen extends Screen {
 		return slotAt(mx, my) == i;
 	}
 
+	/** The slot's cosmetics, narrowed by the search. */
+	private List<Cosmetic> shown() {
+		List<Cosmetic> all = Cosmetics.in(slot);
+		if (search.isEmpty()) return all;
+		String q = search.toLowerCase(Locale.ROOT);
+		List<Cosmetic> out = new ArrayList<>();
+		for (Cosmetic c : all) if (c.name.toLowerCase(Locale.ROOT).contains(q) || c.id.contains(q)) out.add(c);
+		return out;
+	}
+
+	/** How many nodes fit around the ring without touching. */
+	private int capacity() {
+		return Math.max(6, (int) (TAU * ringR / (nodeR * 2 + 9)));
+	}
+
 	/** The cosmetics of the slot, orbiting as nodes; they burst out of the core when the slot changes. */
 	private void renderNodes(GuiGraphics g, int mx, int my, float eased) {
-		List<Cosmetic> list = Cosmetics.in(slot);
+		List<Cosmetic> list = shown();
 		int n = list.size() + 1; // "none" first
+		int cap = capacity();
+		carousel = n > cap;
+		scrollTarget = Math.max(0, Math.min(carousel ? n - cap : 0, scrollTarget));
+		scroll = Anim.approach(scroll, scrollTarget, 12f, dt);
 		float base = Render2D.alpha;
 		float elapsed = (System.currentTimeMillis() - burstStart) / 1000f * Anim.speed();
 		var worn = CosmeticManager.own().get(slot);
@@ -188,22 +215,33 @@ public class WardrobeScreen extends Screen {
 		boolean blocked = false;
 		for (int i = 0; i < n; i++) {
 			Cosmetic c = i == 0 ? null : list.get(i - 1);
-			float a = -TAU / 4 + TAU * i / n + ringAngle;
-			float bp = Anim.enabled() ? Anim.easeOutBack(Anim.clamp01((elapsed - i * 0.03f) / 0.4f)) : 1f;
+			boolean owned = c == null || CosmeticManager.owns(c.id);
+			float a, fade = 1f, order = i;
+			if (carousel) {
+				// Evenly spaced from the bottom of the ring, clockwise, shifted by the scroll.
+				float p = i - scroll;
+				if (p <= -1 || p >= cap) continue;
+				fade = Anim.clamp01(Math.min(p + 1, cap - p));
+				a = TAU / 4 + (p + 0.5f) * TAU / cap;
+				order = Math.max(0, p);
+			} else {
+				a = -TAU / 4 + TAU * i / n + ringAngle;
+			}
+			float bp = Anim.enabled() ? Anim.easeOutBack(Anim.clamp01((elapsed - order * 0.03f) / 0.4f)) : 1f;
 			float rad = ringR * bp * (closing ? eased : 1f);
 			float nx = cx + (float) Math.cos(a) * rad, ny = cy + (float) Math.sin(a) * rad;
-			boolean over = !blocked && !dragging && Math.hypot(mx - nx, my - ny) <= nodeR + 3;
+			boolean over = !blocked && !dragging && fade > 0.5f && Math.hypot(mx - nx, my - ny) <= nodeR + 3;
 			if (over) {
 				blocked = true;
 				if (c == null) hoverNone = true;
 				else hovered = c;
 			}
-			nodeHits.add(new Object[]{c, nx, ny});
+			if (fade > 0.5f) nodeHits.add(new Object[]{c, nx, ny});
 			boolean isWorn = c == null ? worn == null : worn != null && worn.id().equals(c.id);
 			String key = c == null ? "none" : c.id;
 			float hov = anim("hov" + key, over, 18f), en = anim("en" + key, isWorn, 10f);
 			float r = nodeR * (1 + 0.16f * hov + 0.12f * en);
-			Render2D.alpha = base * Anim.clamp01(bp * 1.4f);
+			Render2D.alpha = base * Anim.clamp01(bp * 1.4f) * fade * (owned ? 1f : 0.48f);
 			if (en > 0.01f) {
 				Shapes.ring(g, nx, ny, r + 1f, r + 2.6f, Render2D.withAlpha(Theme.ON, 0.9f * en));
 				Shapes.ring(g, nx, ny, r + 2.6f, r + 5f, Render2D.withAlpha(Theme.ON, 0.18f * en));
@@ -213,7 +251,35 @@ public class WardrobeScreen extends Screen {
 			// "None" counts as worn when nothing is worn, so only read a color from a real cosmetic.
 			int color = c == null ? 0 : isWorn ? worn.color() : c.defaultColor;
 			drawPicture(g, c, nx, ny, r * 1.5f, color, Math.max(hov, en));
+			if (c != null && !owned) {
+				Shapes.disc(g, nx, ny, r * 0.55f, 0xB5080A10);
+				UiText.spacedSmall(g, "LOCK", nx, ny - 2, 0xFFE4D8C8, true, 0.5f);
+			}
 			Render2D.alpha = base;
+		}
+	}
+
+	/** Top left: the search (type anywhere), and which part of a long slot is showing. */
+	private void renderSearch(GuiGraphics g) {
+		int x = 12, y = 10;
+		int total = shown().size();
+		if (search.isEmpty()) {
+			Icons.draw(g, "ui_search", x, y + 3, 8, Theme.O_TEXT_FAINT);
+			UiText.spacedSmall(g, "TYPE TO SEARCH", x + 12 + UiText.spacedWidth("TYPE TO SEARCH", true) * 0.3f, y + 5, Theme.O_TEXT_FAINT, true, 0.6f);
+		} else {
+			String count = total == 0 ? "no matches" : total + (total == 1 ? " match" : " matches");
+			int w = Math.max(120, font.width(search) + font.width(count) + 40);
+			Render2D.roundedRectBordered(g, x, y, w, 16, 8, Theme.GLASS, Render2D.withAlpha(slotColor(slot), 0.8f));
+			Icons.draw(g, "ui_search", x + 6, y + 4, 8, 0xFFFFFFFF);
+			UiText.text(g, search, x + 18, y + 4, 0xFFFFFFFF);
+			UiText.text(g, "_", x + 18 + font.width(search), y + 4, UiText.caretColor());
+			UiText.text(g, count, x + w - 8 - font.width(count), y + 4, Theme.O_TEXT_DIM);
+		}
+		if (carousel) {
+			// The "none" node counts as the first one, so cosmetic numbers start one lower.
+			int cap = capacity(), first = Math.max(1, Math.round(scroll)), last = Math.min(total, Math.round(scroll) + cap - 1);
+			String range = first + "–" + last + " OF " + total;
+			UiText.spacedSmall(g, range, x + UiText.spacedWidth(range, true) * 0.275f, y + 22, Theme.O_TEXT_DIM, true, 0.55f);
 		}
 	}
 
@@ -329,6 +395,13 @@ public class WardrobeScreen extends Screen {
 			Render2D.roundedRect(g, x + (w - chipW) / 2, top + 90, chipW, 9, 4, Render2D.withAlpha(accent, 0.25f));
 			UiText.spacedSmall(g, chip, x + w / 2f, top + 92, accent, true, 0.55f);
 
+			if (!CosmeticManager.owns(focus.id)) {
+				String message = CosmeticManager.ownershipLoaded()
+					? "Claim this free cosmetic at orbit.minearcade.org/shop. Claims are account-bound; nothing equips automatically."
+					: "Checking your account's claims… Connect to the cosmetics server to unlock claimed items.";
+				List<String> lines = UiText.wrap(message, w - 24, 5);
+				for (int i = 0; i < lines.size(); i++) UiText.text(g, lines.get(i), x + 12, top + 108 + i * 10, Theme.O_TEXT_DIM);
+			} else {
 			// Wear / take off.
 			int bw = w - 24, by = top + 104;
 			float bh = anim("wearBtn", Render2D.hovered(mx, my, x + 12, by, bw, 16), 16f);
@@ -340,6 +413,7 @@ public class WardrobeScreen extends Screen {
 
 			// Colors for what's worn.
 			if (isWorn && focus.colorable) renderColors(g, mx, my, x, by + 24, w, focus);
+			}
 		}
 		List<String> status = UiText.wrap(CosmeticSync.status(), w - 24, 2);
 		for (int i = 0; i < status.size(); i++) UiText.text(g, status.get(i), x + 12, y + h - 12 - (status.size() - i) * 10, Theme.O_TEXT_FAINT);
@@ -404,6 +478,7 @@ public class WardrobeScreen extends Screen {
 	}
 
 	private void toggleWear(Cosmetic c) {
+		if (!CosmeticManager.owns(c.id)) return;
 		var worn = CosmeticManager.own().get(c.slot);
 		if (worn != null && worn.id().equals(c.id)) CosmeticManager.remove(c.slot);
 		else CosmeticManager.wear(c, c.defaultColor);
@@ -415,6 +490,7 @@ public class WardrobeScreen extends Screen {
 		slot = lastSlot = s;
 		burstStart = System.currentTimeMillis();
 		ringAngle = ringTarget = 0;
+		scroll = scrollTarget = 0;
 		colorSetting = null;
 	}
 
@@ -473,7 +549,20 @@ public class WardrobeScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double mx, double my, double horizontal, double vertical) {
-		ringTarget += (float) vertical * 0.35f;
+		if (carousel) scrollTarget -= (float) vertical * 2;
+		else ringTarget += (float) vertical * 0.35f;
+		return true;
+	}
+
+	@Override
+	public boolean charTyped(CharacterEvent event) {
+		if (closing || !event.isAllowedChatCharacter()) return false;
+		String s = event.codepointAsString();
+		if (colorSetting != null && colorList.charTyped(s)) return true;
+		if (search.length() < 24 && !(s.equals(" ") && search.isEmpty())) {
+			search += s;
+			scroll = scrollTarget = 0;
+		}
 		return true;
 	}
 
@@ -483,7 +572,16 @@ public class WardrobeScreen extends Screen {
 		int key = event.key();
 		if (colorSetting != null && colorList.keyPressed(key)) return true;
 		if (key == GLFW.GLFW_KEY_ESCAPE) {
-			onClose();
+			if (!search.isEmpty()) search = "";
+			else onClose();
+			return true;
+		}
+		if (key == GLFW.GLFW_KEY_BACKSPACE) {
+			if (!search.isEmpty()) search = search.substring(0, search.length() - 1);
+			return true;
+		}
+		if (key == GLFW.GLFW_KEY_UP || key == GLFW.GLFW_KEY_DOWN) {
+			if (carousel) scrollTarget += key == GLFW.GLFW_KEY_DOWN ? 3 : -3;
 			return true;
 		}
 		if (key == GLFW.GLFW_KEY_RIGHT || key == GLFW.GLFW_KEY_LEFT) {
@@ -512,5 +610,11 @@ public class WardrobeScreen extends Screen {
 	/** For tests. */
 	public void showTab(CosmeticSlot s) {
 		setSlot(s);
+	}
+
+	/** For tests: search as if typed. */
+	public void searchFor(String query) {
+		search = query;
+		scroll = scrollTarget = 0;
 	}
 }

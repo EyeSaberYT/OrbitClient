@@ -360,6 +360,23 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 				{"midnight", null, null, null, null, null, "sword_sheath"},
 				{"midnight", null, "prism_visor", "prism_orbit", "moss_frog", "butterfly_wings", "jetpack"},
 				{"sakura", null, "rune_mask", "phoenix_crown", "ember_drake", "void_wings", "quiver"},
+				{"stormfront", "wizard_hat", "monocle", "snowfall", "pet_cat", "phoenix_wings", null},
+				{"retrowave", "astro_helmet", null, "planet_rings", "pet_rocket", null, "wind_up_key"},
+				{"koi_pond", "viking_helm", "sage_beard", "rain_cloud", "pet_owl", null, "round_shield"},
+				{"magma", "bunny_ears", "heart_glasses", "heart_float", "pet_axolotl", "fairy_wings", null},
+				{"regal", "kabuto", "kitsune_mask", "music_notes", "pet_jellyfish", null, "twin_katanas"},
+				{"frostbite", "propeller_cap", "ski_goggles", "bubbles", "pet_bee", "bat_wings", null},
+				{"hive", "straw_hat", "handlebar", "fireflies", "pet_penguin", null, "party_balloon"},
+				{"plasma", "antlers", "gas_mask", "atom_orbit", "pet_robot", "crystal_wings", null},
+				{"prism_wave", "tricorn", "eye_patch", "autumn_leaves", "pet_fox", null, "fishing_rod"},
+				{"firefly_forest", "flower_crown", "clown_nose", "sleepy_zzz", "pet_ghost", "leaf_wings", null},
+				{null, "toadstool", "cyber_eye", "ender_motes", "pet_goo", "cyber_wings", "electric_guitar"},
+				{null, "chef_hat", "snorkel", "storm_crackle", "pet_duckling", "origami_wings", "scroll_case"},
+				{null, "beanie", "pixel_shades", null, null, "stained_glass_wings", "wanderer_lantern"},
+				{null, "ember_horns", "shinobi_mask", null, null, "bone_wings", "turtle_shell"},
+				{null, null, "retro_3d_glasses", null, null, "raven_wings", "hunters_bow"},
+				{null, null, null, null, null, "bee_wings", "plush_bear"},
+				{null, null, null, null, null, null, "crystal_pickaxe"},
 			};
 			context.runOnClient(mc -> com.orbitclient.module.visual.WaveyCapesModule.testCape = null);
 			for (int o = 0; o < outfits.length; o++) {
@@ -403,6 +420,12 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((com.orbitclient.gui.WardrobeScreen) mc.screen).showTab(com.orbitclient.cosmetics.CosmeticSlot.WINGS));
 			context.waitTicks(30);
 			context.takeScreenshot("orbit-33-wardrobe-wings");
+			context.runOnClient(mc -> ((com.orbitclient.gui.WardrobeScreen) mc.screen).showTab(com.orbitclient.cosmetics.CosmeticSlot.BACK));
+			context.waitTicks(30);
+			context.takeScreenshot("orbit-34-wardrobe-back");
+			context.runOnClient(mc -> ((com.orbitclient.gui.WardrobeScreen) mc.screen).searchFor("ha"));
+			context.waitTicks(20);
+			context.takeScreenshot("orbit-35-wardrobe-search");
 			context.setScreen(() -> null);
 			context.runOnClient(mc -> {
 				for (var slot : com.orbitclient.cosmetics.CosmeticSlot.values()) com.orbitclient.cosmetics.CosmeticManager.remove(slot);

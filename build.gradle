@@ -32,6 +32,27 @@ fabricApi {
 	}
 }
 
+// `gradlew exportCosmetics -Pwebsite=<public dir> -Psheets=<dir>` exports every cosmetic's picture and a JSON list
+// (and contact sheets) from the mod's own cosmetic definitions; see scripts/export-cosmetics.
+sourceSets {
+	exportCosmetics {
+		java.srcDir 'scripts/export-cosmetics/src'
+		compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+		runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+	}
+}
+
+tasks.register('exportCosmetics', JavaExec) {
+	description = 'Exports cosmetic pictures and data for the website (-Pwebsite=<public dir>) and contact sheets (-Psheets=<dir>).'
+	classpath = sourceSets.exportCosmetics.runtimeClasspath
+	mainClass = 'com.orbitclient.cosmetics.ExportCosmetics'
+	systemProperty 'java.awt.headless', 'true'
+	def website = providers.gradleProperty('website').getOrNull()
+	def sheets = providers.gradleProperty('sheets').getOrNull()
+	if (website != null) args '--website', website
+	if (sheets != null) args '--sheets', sheets
+}
+
 processResources {
 	def version = project.version
 	inputs.property "version", version

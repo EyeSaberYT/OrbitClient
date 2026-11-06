@@ -45,6 +45,8 @@ public final class VoxelModel {
 	// The voxel grid itself, kept for drawing the model's picture (see icon).
 	private char[][][] grid;
 	private Map<Character, Paint> gridPalette;
+	// The y of the highest voxel's top edge, in pixels.
+	private float top;
 
 	private static final int[][] DIRS = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
 
@@ -96,11 +98,13 @@ public final class VoxelModel {
 		byte[] normals = new byte[max * 3];
 		int[] paints = new int[max];
 		int f = 0;
+		float top = Float.NaN;
 		for (int y = 0; y < ny; y++) {
 			for (int z = 0; z < nz; z++) {
 				for (int x = 0; x < nx; x++) {
 					char c = grid[y][z][x];
 					if (c == '.') continue;
+					if (Float.isNaN(top)) top = oy + y * size;
 					float x0 = ox + x * size, y0 = oy + y * size, z0 = oz + z * size;
 					float x1 = x0 + size, y1 = y0 + size, z1 = z0 + size;
 					for (int d = 0; d < 6; d++) {
@@ -128,7 +132,13 @@ public final class VoxelModel {
 		VoxelModel model = new VoxelModel(corners, normals, paints, paintList, f);
 		model.grid = grid;
 		model.gridPalette = palette;
+		model.top = Float.isNaN(top) ? oy : top;
 		return model;
+	}
+
+	/** The y of the model's highest point, in pixels (y grows downward). */
+	public float top() {
+		return top;
 	}
 
 	/** A voxel's character from its grid position (x across, y down, z front to back); '.' for empty. */
@@ -148,6 +158,11 @@ public final class VoxelModel {
 			slices[y] = sb.toString();
 		}
 		return build(size, ox, oy, oz, palette, slices);
+	}
+
+	/** Builds a model from a shape function, centered on the origin (for pets and floating bits). */
+	public static VoxelModel centered(float size, Map<Character, Paint> palette, int nx, int ny, int nz, Shape shape) {
+		return shape(size, -nx * size / 2, -ny * size / 2, -nz * size / 2, palette, nx, ny, nz, shape);
 	}
 
 	/**
@@ -224,7 +239,9 @@ public final class VoxelModel {
 	/** The model and its mirror image side by side (hinges in the middle), each voxel a flat square. */
 	private void flatPair(java.awt.Graphics2D g, int size, int tint, int nx, int ny, int nz) {
 		int gap = 2, w = nx * 2 + gap;
-		double scale = (size - 6) / (double) Math.max(w, ny);
+		// Leave a generous inset for the circular wardrobe/orbit masks. Wide wing tips
+		// otherwise sit too close to the node edge and can disappear under the circle.
+		double scale = Math.max(1, size - 64) / (double) Math.max(w, ny);
 		double ox = (size - w * scale) / 2, oy = (size - ny * scale) / 2;
 		g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_OFF);
 		for (int z = nz - 1; z >= 0; z--) { // back to front

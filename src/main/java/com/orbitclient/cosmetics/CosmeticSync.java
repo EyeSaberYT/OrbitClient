@@ -14,9 +14,11 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -35,6 +37,8 @@ public final class CosmeticSync {
 		return t;
 	});
 	private static final long REFRESH_MS = 60_000;
+	private static long claimsAt;
+	private static long uploadRetryAt;
 
 	private static volatile String token;
 	private static volatile String tokenServer;
@@ -125,12 +129,21 @@ public final class CosmeticSync {
 			// Another server or another account (switched in-game): sign in again and upload this account's loadout.
 			uploadedOnce = false;
 			FETCHED.clear();
+			claimsAt = 0;
+			uploadRetryAt = 0;
+			CosmeticManager.setOwned(Set.of());
 		}
 		if (!uploadedOnce || (uploadPending && System.currentTimeMillis() >= uploadAt)) {
+			if (System.currentTimeMillis() < uploadRetryAt) return;
 			uploadPending = false;
 			uploadedOnce = true;
 			String body = CosmeticManager.own().toJson().toString();
 			run(() -> upload(server, body));
+			return;
+		}
+		if (System.currentTimeMillis() - claimsAt >= REFRESH_MS) {
+			claimsAt = System.currentTimeMillis();
+			run(() -> refreshClaims(server));
 			return;
 		}
 		if (++tickCounter % 100 != 0 || !ClientSettings.INSTANCE.showOthersCosmetics.isOn()) return;
@@ -213,11 +226,21 @@ public final class CosmeticSync {
 		return true;
 	}
 
-	private static void upload(String server, String body) {
+	private static void upload(String server, String ignoredBody) {
 		try {
 			for (int attempt = 0; attempt < 2; attempt++) {
 				String t = token(server);
-				if (t == null) return;
+				if (t == null) {
+					uploadedOnce = false;
+					uploadRetryAt = System.currentTimeMillis() + 15_000;
+					return;
+				}
+				if (!refreshClaims(server, t)) {
+					uploadedOnce = false;
+					uploadRetryAt = System.currentTimeMillis() + 15_000;
+					return;
+				}
+				String body = CosmeticManager.own().toJson().toString();
 				HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/loadout")).timeout(Duration.ofSeconds(8))
 					.header("Authorization", "Bearer " + t).header("Content-Type", "application/json")
 					.PUT(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
@@ -227,11 +250,58 @@ public final class CosmeticSync {
 				}
 				status = r.statusCode() == 200 ? "Synced: other Orbit Client players see your cosmetics"
 					: "Cosmetics server error (" + r.statusCode() + ")";
+				if (r.statusCode() == 503) status = "Claim verification is unavailable; your outfit was not synced";
+				if (r.statusCode() != 200) {
+					uploadPending = true;
+					uploadAt = System.currentTimeMillis() + 15_000;
+				}
 				return;
 			}
 		} catch (Exception e) {
 			status = "Can't reach the cosmetics server";
+			uploadedOnce = false;
+			uploadRetryAt = System.currentTimeMillis() + 15_000;
 		}
+	}
+
+	/** Fetch account-bound claims through the authenticated cosmetics-server token. */
+	private static boolean refreshClaims(String server) {
+		try {
+			String t = token(server);
+			return t != null && refreshClaims(server, t);
+		} catch (Exception e) {
+			status = "Can't verify cosmetic claims right now";
+			return false;
+		}
+	}
+
+	private static boolean refreshClaims(String server, String t) throws Exception {
+		HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/shop/claims")).timeout(Duration.ofSeconds(8))
+			.header("Authorization", "Bearer " + t).GET().build(), HttpResponse.BodyHandlers.ofString());
+		if (r.statusCode() == 401) {
+			invalidate(t);
+			status = "Sign in again to check cosmetic claims";
+			return false;
+		}
+		if (r.statusCode() != 200) {
+			status = r.statusCode() == 503 ? "Claim verification is unavailable" : "Cosmetics server error (" + r.statusCode() + ")";
+			return false;
+		}
+		JsonObject response = JsonParser.parseString(r.body()).getAsJsonObject();
+		Set<String> owned = new HashSet<>();
+		if (response.has("cosmetics") && response.get("cosmetics").isJsonArray()) {
+			response.getAsJsonArray("cosmetics").forEach(value -> {
+				if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) owned.add(value.getAsString());
+			});
+		}
+		CompletableFuture<Void> applied = new CompletableFuture<>();
+		Minecraft.getInstance().execute(() -> {
+			try { CosmeticManager.setOwned(owned); applied.complete(null); }
+			catch (Throwable error) { applied.completeExceptionally(error); }
+		});
+		applied.join();
+		claimsAt = System.currentTimeMillis();
+		return true;
 	}
 
 	private static void fetch(String server, List<UUID> uuids) {

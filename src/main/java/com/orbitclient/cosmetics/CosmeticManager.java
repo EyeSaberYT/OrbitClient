@@ -10,6 +10,8 @@ import net.minecraft.world.phys.Vec3;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -64,6 +66,8 @@ public final class CosmeticManager {
 	}
 
 	private static final Loadout OWN = new Loadout();
+	private static volatile Set<String> OWNED = Set.of();
+	private static volatile boolean ownershipLoaded;
 	private static final Map<UUID, Loadout> OTHERS = new ConcurrentHashMap<>();
 	private static final Map<Integer, Vec3> PET_POS = new HashMap<>();
 	private static final Map<Integer, Long> PET_TIME = new HashMap<>();
@@ -79,12 +83,31 @@ public final class CosmeticManager {
 		return OWN;
 	}
 
+	/** Entitlements come from the verified cosmetics server; until fetched, nothing is wearable. */
+	public static boolean owns(String id) {
+		return ownershipLoaded && OWNED.contains(id);
+	}
+
+	public static boolean ownershipLoaded() {
+		return ownershipLoaded;
+	}
+
+	/** Install the server-authoritative item ids and immediately clear any now-unowned outfit entries. */
+	public static synchronized void setOwned(Set<String> ids) {
+		OWNED = Set.copyOf(new HashSet<>(ids));
+		ownershipLoaded = true;
+		boolean changed = OWN.worn.entrySet().removeIf(entry -> !OWNED.contains(entry.getValue().id()));
+		if (preview != null && !OWNED.contains(preview.id)) preview = null;
+		if (changed) onChange.run();
+	}
+
 	/** Called whenever your loadout changes (the sync uploads it). */
 	public static void setOnChange(Runnable r) {
 		onChange = r;
 	}
 
 	public static void wear(Cosmetic c, int color) {
+		if (c == null || !owns(c.id)) return;
 		OWN.worn.put(c.slot, new Worn(c.id, color));
 		onChange.run();
 	}
@@ -107,16 +130,21 @@ public final class CosmeticManager {
 	}
 
 	public static void setPreview(Cosmetic c) {
-		preview = c;
+		preview = c != null && owns(c.id) ? c : null;
 	}
 
 	/** The loadout to draw for a player, or null. */
 	public static Loadout of(UUID uuid) {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.player != null && mc.player.getUUID().equals(uuid)) {
-			if (preview == null) return OWN;
+			Loadout allowed = new Loadout();
+			if (!ownershipLoaded) return allowed;
+			OWN.worn.forEach((slot, worn) -> {
+				if (OWNED.contains(worn.id())) allowed.worn.put(slot, worn);
+			});
+			if (preview == null) return allowed;
 			Loadout l = new Loadout();
-			l.worn.putAll(OWN.worn);
+			l.worn.putAll(allowed.worn);
 			Worn current = OWN.get(preview.slot);
 			l.worn.put(preview.slot, new Worn(preview.id, current != null && current.id().equals(preview.id) ? current.color() : preview.defaultColor));
 			return l;
