@@ -68,5 +68,10 @@ java {
 
 // `gradlew runClientGameTest -PperfTest` runs only PerformanceTest: where frame time goes.
 if (project.hasProperty('perfTest')) {
-	tasks.matching { it.name == 'runClientGameTest' }.configureEach { it.jvmArgs '-Dorbit.perfTest=true' }
+	// The game-test network synchronizer keeps client and server in lockstep, which a frame-rate test doesn't need,
+	// and it stops the server when the client-side players this test adds change what it tracks.
+	tasks.matching { it.name == 'runClientGameTest' }.configureEach {
+		it.jvmArgs '-Dorbit.perfTest=true', '-Dfabric.client.gametest.disableNetworkSynchronizer=true'
+		if (project.hasProperty('perfBenchmarkOnly')) it.jvmArgs '-Dorbit.perfBenchmarkOnly=true'
+	}
 }

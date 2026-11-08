@@ -30,6 +30,8 @@ public class OrbitClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		// The client starts on the render thread; laid-out text is only reused there.
+		com.orbitclient.util.TextLayoutCache.init(Thread.currentThread());
 		// Minecraft starts Java headless, which leaves no clipboard for images. Turn that back off
 		// before anything asks AWT, so the Screenshot module can copy pictures without starting
 		// another program. Not on macOS: AWT there takes over the main thread GLFW needs.
