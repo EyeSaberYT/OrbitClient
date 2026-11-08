@@ -30,6 +30,7 @@ public class OrbitClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		MixinAudit.runIfRequested();
 		// Before the keys register and options.txt loads, so rebinds from Eclipse Client carry over.
 		ConfigManager.migrateFromEclipse();
 		menuKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(

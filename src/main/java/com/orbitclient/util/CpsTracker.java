@@ -19,11 +19,10 @@ public final class CpsTracker {
 	public static void update() {
 		Minecraft mc = Minecraft.getInstance();
 		long now = System.currentTimeMillis();
-		long window = mc.getWindow().handle();
 		boolean inGame = mc.screen == null;
 
-		boolean left = inGame && GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
-		boolean right = inGame && GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
+		boolean left = inGame && InputUtil.isMouseDown(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		boolean right = inGame && InputUtil.isMouseDown(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
 		if (left && !leftWasDown) LEFT.addLast(now);
 		if (right && !rightWasDown) RIGHT.addLast(now);
 		leftWasDown = left;

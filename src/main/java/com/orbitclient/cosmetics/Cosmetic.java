@@ -7,7 +7,6 @@ import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.resources.Identifier;
 
 /**
@@ -16,7 +15,7 @@ import net.minecraft.resources.Identifier;
  */
 public final class Cosmetic {
 	static final Identifier WHITE = Identifier.fromNamespaceAndPath(OrbitClient.MOD_ID, "textures/cosmetics/white.png");
-	static final RenderType VOXELS = RenderTypes.entityCutoutNoCull(WHITE);
+	static final RenderType VOXELS = net.minecraft.client.renderer.rendertype.RenderTypes.entityCutoutNoCull(WHITE);
 
 	/** Everything a cosmetic needs to draw itself for one player this frame. */
 	public record Context(PoseStack pose, SubmitNodeCollector collector, int light, PlayerModel model,

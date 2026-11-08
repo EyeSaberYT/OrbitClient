@@ -5,6 +5,20 @@ plugins {
 
 def mc = stonecutter.current.version
 def unobfuscated = stonecutter.current.parsed.matches('>=26.1')
+def fabricApiByVersion = [
+	'1.16.5': '0.42.0+1.16', '1.17.1': '0.46.1+1.17',
+	'1.18.2': '0.77.0+1.18.2', '1.19.2': '0.77.0+1.19.2', '1.19.3': '0.76.1+1.19.3',
+	'1.19.4': '0.87.2+1.19.4', '1.20': '0.83.0+1.20', '1.20.1': '0.92.12+1.20.1',
+	'1.20.2': '0.91.6+1.20.2', '1.20.3': '0.91.1+1.20.3', '1.20.4': '0.97.3+1.20.4',
+	'1.20.5': '0.97.8+1.20.5', '1.20.6': '0.100.8+1.20.6', '1.21': '0.102.0+1.21',
+	'1.21.1': '0.116.17+1.21.1', '1.21.3': '0.114.1+1.21.3', '1.21.4': '0.119.4+1.21.4',
+	'1.21.5': '0.128.2+1.21.5', '1.21.6': '0.128.2+1.21.6', '1.21.7': '0.129.0+1.21.7',
+	'1.21.8': '0.136.1+1.21.8', '1.21.9': '0.134.1+1.21.9', '1.21.10': '0.138.4+1.21.10',
+	'1.21.11': '0.141.6+1.21.11', '26.1': '0.145.1+26.1', '26.1.1': '0.145.4+26.1.1',
+	'26.1.2': '0.155.3+26.1.2', '26.2': '0.161.0+26.2', '26.3': '0.165.2+26.3'
+]
+def fabricApiVersion = project.findProperty('deps.fabric_api') ?: fabricApiByVersion[mc]
+def minecraftRange = project.findProperty('deps.minecraft_range') ?: "~${mc}"
 
 version = "${project.mod_version}+${mc}"
 group = project.maven_group
@@ -17,7 +31,17 @@ dependencies {
 	minecraft "com.mojang:minecraft:${mc}"
 	loomx.applyMojangMappings()
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.property('deps.fabric_api')}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+}
+
+// `gradlew :<version>:runClient -PmixinAudit` starts the game, applies every mixin and quits (see MixinAudit).
+if (project.hasProperty('mixinAudit')) {
+	loom.runs.client.vmArg '-Dorbit.mixinAudit=true'
+}
+
+// `gradlew :1.21.11:runClientGameTest -PperfTest` runs only PerformanceTest: what each mod costs per frame.
+if (project.hasProperty('perfTest')) {
+	tasks.matching { it.name == 'runClientGameTest' }.configureEach { it.jvmArgs '-Dorbit.perfTest=true' }
 }
 
 // Client game tests: `gradlew runClientGameTest` opens a world and screenshots the menus (run/screenshots).
@@ -31,24 +55,148 @@ fabricApi {
 }
 
 // Names that changed between versions, rewritten in the sources for the version being built.
-stonecutter {
-	replacements.string(unobfuscated) {
-		replace 'GuiGraphics', 'GuiGraphicsExtractor'
-		replace 'com.mojang.blaze3d.pipeline.RenderPipeline', 'com.mojang.renderpearl.api.pipeline.RenderPipeline'
-		replace 'net.minecraft.client.renderer.state.CameraRenderState', 'net.minecraft.client.renderer.state.level.CameraRenderState'
+	stonecutter {
+	// Mojang renamed these in 1.21.11 (ResourceLocation became Identifier, and so on).
+	replacements.string(stonecutter.current.parsed.matches('<1.21.11')) {
+		replace 'net.minecraft.resources.Identifier', 'net.minecraft.resources.ResourceLocation'
+		replace 'Identifier', 'ResourceLocation'
+		replace 'mc.debugEntries.isOverlayVisible()', 'mc.getDebugOverlay().showDebugScreen()'
+		replace '.dimension().identifier()', '.dimension().location()'
+		replace 'sound.getIdentifier()', 'sound.getLocation()'
+		replace 'camera.yRot()', 'camera.getYRot()'
+		replace 'camera.xRot()', 'camera.getXRot()'
+		replace 'this.sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR);', 'this.setFilter(true, false); // Legacy sampler'
+		replace 'sampler = RenderSystem.getDevice().createSampler(AddressMode.REPEAT, AddressMode.REPEAT, FilterMode.LINEAR, FilterMode.LINEAR, 1, OptionalDouble.empty());', 'this.setFilter(true, false); // Legacy repeat sampler'
 	}
+	replacements.string(stonecutter.current.parsed.matches('<=1.21.10')) {
+		replace 'import net.minecraft.client.renderer.rendertype.RenderType;', 'import net.minecraft.client.renderer.RenderType;'
+		replace 'net.minecraft.client.renderer.rendertype.RenderTypes.entityCutoutNoCull', 'RenderType.entityCutoutNoCull'
+		replace 'net.minecraft.client.model.player.PlayerModel', 'net.minecraft.client.model.PlayerModel'
+	}
+	// 1.21.11 -> 26.x, one way: the shared sources are written for 1.21.11, and string replacements also run
+	// backwards for the other versions, which turned every -1, 10, .text( or item( there into 26.x code.
+	// Regex replacements take their own reverse; (?!)... never matches, so the other versions are left alone.
+	def reverses = 0
+	def className = /([a-z][a-z0-9_]*\.)+[A-Z]\w*;?/
+	def oneWay = { boolean when, List renames ->
+		// A moved class also moves in the slashed form mixins use in signatures (Lnet/minecraft/...;).
+		def slashed = renames.findAll { it[0] ==~ className && it[1] ==~ className }
+			.collect { [it[0].replace('.', '/'), it[1].replace('.', '/')] }
+		replacements.regex(when) {
+			(renames + slashed).each { pair ->
+				// Each reverse needs its own pattern and a non-empty value; neither is ever used.
+				replace java.util.regex.Pattern.quote(pair[0]), java.util.regex.Matcher.quoteReplacement(pair[1]), "(?!)reverse${reverses++}", 'unused'
+			}
+		}
+	}
+	def v = stonecutter.current.parsed
+	// Every 26.x version.
+	oneWay(unobfuscated, [
+		['import org.lwjgl.glfw.GLFW;', '// GLFW replaced by SDL-backed InputConstants'],
+		['net.fabricmc.fabric.api.client.keybinding.v1', 'net.fabricmc.fabric.api.client.keymapping.v1'],
+		['KeyBindingHelper', 'KeyMappingHelper'],
+		['registerKeyBinding(', 'registerKeyMapping('],
+		['net.minecraft.client.GuiMessage', 'net.minecraft.client.multiplayer.chat.GuiMessage'],
+		['net.minecraft.client.renderer.RenderTypes', 'net.minecraft.client.renderer.rendertype.RenderTypes'],
+		['net.minecraft.client.renderer.RenderType;', 'net.minecraft.client.renderer.rendertype.RenderType;'],
+		['GLFW.GLFW_KEY_UNKNOWN', '-1'],
+		['GLFW.GLFW_KEY_LEFT_ALT', 'com.mojang.blaze3d.platform.InputConstants.KEY_LALT'],
+		['GLFW.GLFW_KEY_ENTER', 'com.mojang.blaze3d.platform.InputConstants.KEY_RETURN'],
+		['GLFW.GLFW_KEY_KP_ENTER', 'com.mojang.blaze3d.platform.InputConstants.KEY_NUMPADENTER'],
+		['GLFW.GLFW_KEY_ESCAPE', 'com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE'],
+		['GLFW.GLFW_KEY_BACKSPACE', 'com.mojang.blaze3d.platform.InputConstants.KEY_BACKSPACE'],
+		['GLFW.GLFW_KEY_DELETE', 'com.mojang.blaze3d.platform.InputConstants.KEY_DELETE'],
+		['GLFW.GLFW_KEY_TAB', 'com.mojang.blaze3d.platform.InputConstants.KEY_TAB'],
+		['GLFW.GLFW_KEY_LEFT', 'com.mojang.blaze3d.platform.InputConstants.KEY_LEFT'],
+		['GLFW.GLFW_KEY_RIGHT', 'com.mojang.blaze3d.platform.InputConstants.KEY_RIGHT'],
+		['GLFW.GLFW_KEY_UP', 'com.mojang.blaze3d.platform.InputConstants.KEY_UP'],
+		['GLFW.GLFW_KEY_DOWN', 'com.mojang.blaze3d.platform.InputConstants.KEY_DOWN'],
+		['GLFW.GLFW_KEY_P', 'com.mojang.blaze3d.platform.InputConstants.KEY_P'],
+		['GLFW.GLFW_KEY_V', 'com.mojang.blaze3d.platform.InputConstants.KEY_V'],
+		['GLFW.GLFW_KEY_Z', 'com.mojang.blaze3d.platform.InputConstants.KEY_Z'],
+		['GLFW.GLFW_MOUSE_BUTTON_LEFT', 'com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT'],
+		['GLFW.GLFW_MOUSE_BUTTON_RIGHT', 'com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_RIGHT'],
+		['GLFW.GLFW_MOUSE_BUTTON_MIDDLE', 'com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_MIDDLE'],
+		['GLFW.GLFW_MOD_CONTROL', 'com.mojang.blaze3d.platform.InputConstants.MOD_CONTROL'],
+		['GLFW.GLFW_MOD_SHIFT', 'com.mojang.blaze3d.platform.InputConstants.MOD_SHIFT'],
+		['return GLFW.glfwGetMouseButton(Minecraft.getInstance().getWindow().handle(), button) == GLFW.GLFW_PRESS;', 'return (button == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT && Minecraft.getInstance().mouseHandler.isLeftPressed()) || (button == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_RIGHT && Minecraft.getInstance().mouseHandler.isRightPressed()) || (button == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_MIDDLE && Minecraft.getInstance().mouseHandler.isMiddlePressed());'],
+		['net.minecraft.client.renderer.rendertype.RenderTypes.entityCutoutNoCull', 'net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout'],
+		['public void render(GuiGraphics g, int mx, int my, float delta)', 'public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta)'],
+		['public void renderBackground(GuiGraphics g, int mx, int my, float delta)', 'public void extractBackground(GuiGraphicsExtractor g, int mx, int my, float delta)'],
+		['super.renderBackground(g, mx, my, delta)', 'super.extractBackground(g, mx, my, delta)'],
+		['super.render(g, mx, my, delta)', 'super.extractRenderState(g, mx, my, delta)'],
+		['submitEntityRenderState(', 'entity('],
+		['.getDayTime()', '.getOverworldClockTime()'],
+		['renderItem(', 'item('],
+		['.drawString(', '.text('],
+		['original.render(', 'original.extractRenderState('],
+		['element.render(', 'element.extractRenderState('],
+		['tabList.render(', 'tabList.extractRenderState('],
+		['VanillaHudElements.STATUS_EFFECTS', 'VanillaHudElements.MOB_EFFECTS'],
+		['client.setScreen(', 'client.setScreenAndShow('],
+		['minecraft.setScreen(', 'minecraft.setScreenAndShow('],
+		['mc.setScreen(', 'mc.setScreenAndShow('],
+		['pose.mulPose(rotation);', 'pose.mulPose(new org.joml.Matrix4f().rotation(rotation));'],
+		['GuiGraphics', 'GuiGraphicsExtractor'],
+		['net.minecraft.client.renderer.state.CameraRenderState', 'net.minecraft.client.renderer.state.level.CameraRenderState'],
+		['net.minecraft.resources.ResourceLocation', 'net.minecraft.resources.Identifier'],
+		['ResourceLocation', 'Identifier'],
+		['@Invoker("renderBlurredBackground")', '@Invoker("extractBlurredBackground")'],
+		['method = "renderItemHotbar"', 'method = "extractItemHotbar"'],
+		['LivingEntityFeatureRendererRegistrationCallback', 'LivingEntityRenderLayerRegistrationCallback'],
+		// 26.1 added where a chat message came from.
+		['addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V', 'addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageSource;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V'],
+	])
+	// 26.2 split the in-game GUI into Gui (screens, chat) and Hud.
+	oneWay(v.matches('>=26.2'), [
+		['mc.gui.getTabList()', 'mc.gui.hud.getTabList()'],
+		['mc.gui.setOverlayMessage(', 'mc.gui.hud.setOverlayMessage('],
+		['mc.gui.getChat().getLinesPerPage()', '10'],
+		['Minecraft.getInstance().gui.getChat()', 'Minecraft.getInstance().gui.chatListener()'],
+		['Gui.getMobEffectSprite(', 'Hud.getMobEffectSprite('],
+		['import net.minecraft.client.gui.Gui;', 'import net.minecraft.client.gui.Gui;\nimport net.minecraft.client.gui.Hud;'],
+		['Items.RED_DYE', 'Items.WOOL.red()'],
+		['Items.WHITE_BANNER', 'Items.BANNER.white()'],
+		['mc.options.hideGui', 'mc.gui.hud.isHidden()'],
+		['mc.getMainRenderTarget()', 'mc.gameRenderer.mainRenderTarget()'],
+		['mc.gameRenderer.getMainCamera()', 'mc.gameRenderer.mainCamera()'],
+		['mc.gui.getChat()', 'mc.gui.chatListener()'],
+		['mc.screen', 'mc.gui.screen()'],
+		['Minecraft.getInstance().screen', 'Minecraft.getInstance().gui.screen()'],
+		['client.screen', 'client.gui.screen()'],
+		['net.minecraft.client.renderer.MultiBufferSource', 'net.minecraft.client.renderer.SubmitNodeCollector'],
+		['MultiBufferSource', 'SubmitNodeCollector'],
+		['@Mixin(Gui.class)', '@Mixin(Hud.class)'],
+		['method = "renderFire"', 'method = "submitFire"'],
+		['method = "renderHitOutline"', 'method = "submitHitOutline"'],
+	])
+	// 26.3 moved the render API to com.mojang.renderpearl and renamed key input.
+	oneWay(v.matches('>=26.3'), [
+		['com.mojang.blaze3d.textures.AddressMode', 'com.mojang.renderpearl.api.textures.AddressMode'],
+		['com.mojang.blaze3d.textures.FilterMode', 'com.mojang.renderpearl.api.textures.FilterMode'],
+		['com.mojang.blaze3d.pipeline.RenderPipeline', 'com.mojang.renderpearl.api.pipeline.RenderPipeline'],
+		['InputConstants.Type.KEYSYM', 'InputConstants.Type.KEYBOARD'],
+		['return GLFW.glfwGetKey(Minecraft.getInstance().getWindow().handle(), key) == GLFW.GLFW_PRESS;', 'return com.mojang.blaze3d.platform.InputConstants.isKeyDown(key);'],
+		['Lcom/mojang/blaze3d/pipeline/RenderPipeline;', 'Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;'],
+		['GameRenderer;renderLevel(Lnet/minecraft/client/DeltaTracker;)V', 'GameRenderer;renderLevel()V'],
+	])
+	oneWay(unobfuscated && v.matches('<26.3'), [
+		['return GLFW.glfwGetKey(Minecraft.getInstance().getWindow().handle(), key) == GLFW.GLFW_PRESS;', 'return com.mojang.blaze3d.platform.InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), key);'],
+	])
 }
 
+// 26.x needs Java 25, 1.20.5 to 1.21.x run on Java 21, and older versions on Java 17
+// (launchers like Lunar run 1.16.5 and 1.17.1 on 17 too).
+def javaVersion = unobfuscated ? 25 : stonecutter.current.parsed.matches('>=1.20.5') ? 21 : 17
+
 processResources {
-	def props = [version: project.version, minecraft: project.property('deps.minecraft_range')]
+	// Mixin's compatibility level stops at JAVA_21 in some loader versions; 21 also covers 26.x.
+	def props = [version: project.version, minecraft: minecraftRange, java: javaVersion, mixinJava: Math.min(javaVersion, 21)]
 	inputs.properties props
-	filesMatching("fabric.mod.json") {
+	filesMatching(["fabric.mod.json", "*.mixins.json"]) {
 		expand props
 	}
 }
-
-// 26.x needs Java 25; 1.21.x runs on Java 21.
-def javaVersion = unobfuscated ? 25 : 21
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = javaVersion
 }

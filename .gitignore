@@ -56,3 +56,6 @@ gametest.log
 /versions/*/build/
 *.log
 
+
+# Python tools
+__pycache__/

@@ -1,7 +1,8 @@
 {
 	"required": true,
 	"package": "com.orbitclient.mixin",
-	"compatibilityLevel": "JAVA_21",
+	"plugin": "com.orbitclient.mixin.OrbitMixinPlugin",
+	"compatibilityLevel": "JAVA_${mixinJava}",
 	"client": [
 		"AbstractClientPlayerMixin",
 		"AbstractContainerScreenMixin",

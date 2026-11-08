@@ -17,6 +17,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GameRenderer.class)
 public class GameRendererMixin {
+	// From 26.1 the camera works out the field of view: see CameraMixin.
+	//? if <26.1 {
 	/** useFovSetting is false for the held-item pass, which shouldn't zoom. */
 	@ModifyReturnValue(method = "getFov", at = @At("RETURN"))
 	private float orbit$zoom(float fov, @Local(argsOnly = true) boolean useFovSetting) {
@@ -25,6 +27,7 @@ public class GameRendererMixin {
 		WaypointsModule.setFov(result);
 		return result;
 	}
+	//?}
 
 	/** No hand or held item in the way while zoomed in. */
 	@Inject(method = "renderItemInHand", at = @At("HEAD"), cancellable = true)

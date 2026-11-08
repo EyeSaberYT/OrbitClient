@@ -59,7 +59,10 @@ public class ChatModule extends Module {
 		m.lastText = text;
 		if (m.timestamps.isOn()) {
 			String time = LocalTime.now().format(m.twelveHour.isOn() ? TIME_12 : TIME_24);
-			result = Component.literal("[" + time + "] ").withStyle(ChatFormatting.DARK_GRAY).append(result);
+			// Siblings under an unstyled root: appending the message to the grey timestamp would make it inherit the grey.
+			result = Component.empty()
+				.append(Component.literal("[" + time + "] ").withStyle(ChatFormatting.DARK_GRAY))
+				.append(result);
 		}
 		return result;
 	}

@@ -2,6 +2,7 @@ package com.orbitclient.cosmetics;
 
 import com.orbitclient.cosmetics.VoxelModel.Paint;
 import com.mojang.math.Axis;
+import com.orbitclient.util.PoseUtil;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -100,7 +101,7 @@ public final class Cosmetics {
 		add("halo", "Halo", CosmeticSlot.HAT, 0xFFFFE89A, true, ctx -> {
 			ctx.attach(ctx.model().head);
 			ctx.pose().translate(0, (-12.5f + (float) Math.sin(ctx.time() * 2.2) * 0.6f) / 16f, 0);
-			ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (ctx.time() * 25 % 360)));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (ctx.time() * 25 % 360)));
 			ctx.draw(halo);
 			ctx.pose().popPose();
 		});
@@ -111,7 +112,7 @@ public final class Cosmetics {
 			ctx.attach(ctx.model().head);
 			// A small twitch every few seconds.
 			float twitch = (float) Math.max(0, Math.sin(ctx.time() * 1.3) - 0.9) * 60f;
-			ctx.pose().mulPose(Axis.XP.rotationDegrees(-twitch * 0.3f));
+			PoseUtil.mulPose(ctx.pose(), Axis.XP.rotationDegrees(-twitch * 0.3f));
 			ctx.draw(catEars);
 			ctx.pose().popPose();
 		});
@@ -395,7 +396,7 @@ public final class Cosmetics {
 				double a = ctx.time() * 1.6 + i * Math.PI * 2 / 3;
 				ctx.pose().pushPose();
 				ctx.pose().translate((float) Math.cos(a) * 11 / 16f, (8 + (float) Math.sin(a * 2 + i) * 2.5f) / 16f, (float) Math.sin(a) * 11 / 16f);
-				ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (ctx.time() * 90 % 360)));
+				PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (ctx.time() * 90 % 360)));
 				ctx.draw(orb);
 				ctx.pose().popPose();
 			}
@@ -414,7 +415,7 @@ public final class Cosmetics {
 			ctx.pose().pushPose();
 			ctx.model().root().translateAndRotate(ctx.pose());
 			ctx.pose().translate(0, 23.6f / 16f, 0);
-			ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (ctx.time() * 20 % 360)));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (ctx.time() * 20 % 360)));
 			ctx.draw(runeRing);
 			ctx.pose().popPose();
 		});
@@ -463,7 +464,7 @@ public final class Cosmetics {
 				double a = ctx.time() * 0.9 + i * Math.PI / 2;
 				ctx.pose().pushPose();
 				ctx.pose().translate((float) Math.cos(a) * 10 / 16f, (5 + (float) Math.sin(a * 1.5) * 5) / 16f, (float) Math.sin(a) * 7 / 16f);
-				ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (-ctx.time() * 55 % 360)));
+				PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (-ctx.time() * 55 % 360)));
 				ctx.draw(crystal);
 				ctx.pose().popPose();
 			}
@@ -481,7 +482,7 @@ public final class Cosmetics {
 			ctx.pose().pushPose();
 			ctx.model().root().translateAndRotate(ctx.pose());
 			ctx.pose().translate(0, 22.5f / 16f, 0);
-			ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (ctx.time() * 16 % 360)));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (ctx.time() * 16 % 360)));
 			ctx.draw(flameHalo);
 			ctx.pose().popPose();
 		});
@@ -500,8 +501,8 @@ public final class Cosmetics {
 			pet(ctx, () -> {
 				ctx.draw(wisp);
 				ctx.pose().pushPose();
-				ctx.pose().mulPose(Axis.XP.rotationDegrees(70));
-				ctx.pose().mulPose(Axis.ZP.rotationDegrees((float) (ctx.time() * 120 % 360)));
+				PoseUtil.mulPose(ctx.pose(), Axis.XP.rotationDegrees(70));
+				PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees((float) (ctx.time() * 120 % 360)));
 				ctx.draw(wispRing);
 				ctx.pose().popPose();
 			});
@@ -562,7 +563,7 @@ public final class Cosmetics {
 				return ((x + y + z) % 5 == 0) ? '%' : '#';
 			});
 		add("ember_drake", "Pocket Drake", CosmeticSlot.PET, 0xFFEA7750, true, ctx -> pet(ctx, () -> {
-			ctx.pose().mulPose(Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 0.8) * 10));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 0.8) * 10));
 			ctx.draw(miniDrake);
 		}));
 		// Pictures for the menus.
@@ -616,8 +617,8 @@ public final class Cosmetics {
 			// Swept back and slightly up, flapping around the hinge.
 			float phase = side < 0 ? 0.22f : 0f;
 			float localFlap = (float) (Math.sin(ctx.time() * speed + phase) * (active ? 3.5 : 1.2) * flapScale);
-			ctx.pose().mulPose(Axis.YP.rotationDegrees(side * (-28f - flap)));
-			ctx.pose().mulPose(Axis.ZP.rotationDegrees(side * (-12f + localFlap)));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees(side * (-28f - flap)));
+			PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees(side * (-12f + localFlap)));
 			if (side < 0) ctx.pose().scale(-1, 1, 1);
 			ctx.draw(wing);
 			ctx.pose().popPose();
@@ -633,7 +634,7 @@ public final class Cosmetics {
 		ctx.model().root().translateAndRotate(ctx.pose());
 		ctx.pose().translate((float) offset.x, (float) offset.y, (float) offset.z);
 		ctx.pose().translate(0, (float) Math.sin(ctx.time() * 2.4) * 0.06f, 0);
-		ctx.pose().mulPose(Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 0.9) * 25f));
+		PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 0.9) * 25f));
 		draw.run();
 		ctx.pose().popPose();
 	}

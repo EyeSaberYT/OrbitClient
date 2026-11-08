@@ -56,11 +56,10 @@ public class ToggleSprintModule extends TextHudModule {
 
 	private static boolean isPhysicallyDown(KeyMapping mapping) {
 		InputConstants.Key key = KeyBindingHelper.getBoundKeyOf(mapping);
-		long window = mc.getWindow().handle();
 		if (key.getType() == InputConstants.Type.MOUSE) {
-			return GLFW.glfwGetMouseButton(window, key.getValue()) == GLFW.GLFW_PRESS;
+			return com.orbitclient.util.InputUtil.isMouseDown(key.getValue());
 		}
-		return key.getValue() != GLFW.GLFW_KEY_UNKNOWN && GLFW.glfwGetKey(window, key.getValue()) == GLFW.GLFW_PRESS;
+		return key.getValue() != GLFW.GLFW_KEY_UNKNOWN && com.orbitclient.util.InputUtil.isKeyDown(key.getValue());
 	}
 
 	@Override

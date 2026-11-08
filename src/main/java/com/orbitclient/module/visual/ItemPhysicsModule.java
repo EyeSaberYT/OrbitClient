@@ -4,6 +4,7 @@ import com.orbitclient.module.Category;
 import com.orbitclient.module.Module;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import com.orbitclient.util.PoseUtil;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.ItemEntityRenderer;
 import net.minecraft.client.renderer.entity.state.ItemEntityRenderState;
@@ -35,10 +36,10 @@ public class ItemPhysicsModule extends Module {
 		boolean flat = box.getZsize() < 0.2;
 		float angle = (state.seed & 0xFFFF) / 65536f * 360f;
 		pose.pushPose();
-		pose.mulPose(Axis.YP.rotationDegrees(angle));
+		PoseUtil.mulPose(pose, Axis.YP.rotationDegrees(angle));
 		if (flat) {
 			pose.translate(0f, 0.02f, 0f);
-			pose.mulPose(Axis.XP.rotationDegrees(90));
+			PoseUtil.mulPose(pose, Axis.XP.rotationDegrees(90));
 			// Centered on the entity, resting on its face.
 			pose.translate(0f, (float) (-(box.minY + box.maxY) / 2), (float) (box.getZsize() / 2));
 		} else {

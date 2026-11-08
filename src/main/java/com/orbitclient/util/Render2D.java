@@ -34,7 +34,11 @@ public final class Render2D {
 
 	public static void outline(GuiGraphics g, int x, int y, int w, int h, int color) {
 		color = a(color);
-		if (!invisible(color)) g.renderOutline(x, y, w, h, color);
+		if (invisible(color) || w <= 0 || h <= 0) return;
+		g.fill(x, y, x + w, y + 1, color);
+		g.fill(x, y + h - 1, x + w, y + h, color);
+		g.fill(x, y + 1, x + 1, y + h - 1, color);
+		g.fill(x + w - 1, y + 1, x + w, y + h - 1, color);
 	}
 
 	public static void gradient(GuiGraphics g, int x1, int y1, int x2, int y2, int top, int bottom) {
