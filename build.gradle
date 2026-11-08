@@ -65,3 +65,8 @@ java {
 	sourceCompatibility = JavaVersion.VERSION_21
 	targetCompatibility = JavaVersion.VERSION_21
 }
+
+// `gradlew runClientGameTest -PperfTest` runs only PerformanceTest: where frame time goes.
+if (project.hasProperty('perfTest')) {
+	tasks.matching { it.name == 'runClientGameTest' }.configureEach { it.jvmArgs '-Dorbit.perfTest=true' }
+}

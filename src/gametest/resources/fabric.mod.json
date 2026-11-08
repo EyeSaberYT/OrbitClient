@@ -5,7 +5,7 @@
 	"name": "Orbit Client Tests",
 	"environment": "client",
 	"entrypoints": {
-		"fabric-client-gametest": ["com.orbitclient.test.SessionSwitchTest", "com.orbitclient.test.MenuScreenshotTest", "com.orbitclient.test.CapeMotionTest"]
+		"fabric-client-gametest": ["com.orbitclient.test.SessionSwitchTest", "com.orbitclient.test.GlintColorizerTest", "com.orbitclient.test.MenuScreenshotTest", "com.orbitclient.test.CapeMotionTest", "com.orbitclient.test.PerformanceTest"]
 	},
 	"depends": {
 		"orbitclient": "*"

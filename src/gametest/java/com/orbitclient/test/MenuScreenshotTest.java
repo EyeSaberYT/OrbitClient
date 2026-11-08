@@ -43,6 +43,7 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (Boolean.getBoolean("orbit.perfTest")) return;  // a PerformanceTest run
 		context.getInput().resizeWindow(1600, 900);
 		context.waitTicks(40);
 		context.takeScreenshot("orbit-00-home");

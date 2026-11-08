@@ -9,7 +9,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.AddressMode;
 import com.mojang.blaze3d.textures.FilterMode;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
@@ -20,7 +19,8 @@ import java.util.OptionalDouble;
 
 /**
  * Recolors the enchantment glint. The glint textures are replaced with copies tinted to your color
- * (brightness kept from the original), and put back when the mod is turned off.
+ * (brightness kept from the original), and Minecraft loads its own again when the mod is turned off.
+ * The originals are read once; a new color (every tick with chroma) only recolors those copies.
  */
 public class GlintColorizerModule extends Module {
 	private static final Identifier[] GLINTS = {
@@ -31,7 +31,10 @@ public class GlintColorizerModule extends Module {
 	private final ColorSetting color;
 	private final BooleanSetting allItems;
 	private int applied;
-	private final AbstractTexture[] originals = new AbstractTexture[GLINTS.length];
+	/** Our tinted copy of each glint, registered in place of Minecraft's. */
+	private final GlintTexture[] tinted = new GlintTexture[GLINTS.length];
+	/** Each original glint pixel's alpha (top byte) and brightness (low byte). */
+	private final int[][] source = new int[GLINTS.length][];
 
 	/** A tinted glint; it scrolls across items, so it must repeat and be smooth. */
 	private static final class GlintTexture extends DynamicTexture {
@@ -67,37 +70,52 @@ public class GlintColorizerModule extends Module {
 	protected void onDisable() {
 		var textures = Minecraft.getInstance().getTextureManager();
 		for (int i = 0; i < GLINTS.length; i++) {
-			if (originals[i] != null) textures.register(GLINTS[i], originals[i]);
-			originals[i] = null;
+			// Closes our copy; Minecraft loads its own glint again the next time it's drawn.
+			if (tinted[i] != null) textures.release(GLINTS[i]);
+			tinted[i] = null;
+			source[i] = null;
 		}
 		applied = 0;
 	}
 
 	private void apply(int argb) {
 		Minecraft mc = Minecraft.getInstance();
-		var textures = mc.getTextureManager();
-		float r = ((argb >> 16) & 0xFF) / 255f, g = ((argb >> 8) & 0xFF) / 255f, b = (argb & 0xFF) / 255f;
+		int r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
 		for (int i = 0; i < GLINTS.length; i++) {
-			var resource = mc.getResourceManager().getResource(GLINTS[i]);
-			if (resource.isEmpty()) continue;
-			try (InputStream in = resource.get().open()) {
-				NativeImage image = NativeImage.read(in);
-				for (int y = 0; y < image.getHeight(); y++) {
-					for (int x = 0; x < image.getWidth(); x++) {
-						int p = image.getPixel(x, y);
-						int a = (p >>> 24) & 0xFF;
-						// Brightness of the original glint pixel, re-tinted with the chosen color.
-						float lum = Math.max((p >> 16) & 0xFF, Math.max((p >> 8) & 0xFF, p & 0xFF)) / 255f;
-						image.setPixel(x, y, (a << 24) | (Math.round(lum * r * 255) << 16) | (Math.round(lum * g * 255) << 8) | Math.round(lum * b * 255));
-					}
-				}
-				if (originals[i] == null) originals[i] = textures.getTexture(GLINTS[i]);
-				GlintTexture tinted = new GlintTexture(image);
-				tinted.upload();
-				textures.register(GLINTS[i], tinted);
-			} catch (Exception e) {
-				// Leave the vanilla glint if the texture can't be read (e.g. a resource pack replaced it oddly).
+			if (tinted[i] == null && !load(mc, i)) continue;
+			NativeImage image = tinted[i].getPixels();
+			int[] pixels = source[i];
+			int width = image.getWidth();
+			for (int p = 0; p < pixels.length; p++) {
+				int alpha = pixels[p] >>> 24, lum = pixels[p] & 0xFF;
+				// Brightness of the original glint pixel, re-tinted with the chosen color.
+				image.setPixel(p % width, p / width, (alpha << 24) | (lum * r / 255 << 16) | (lum * g / 255 << 8) | lum * b / 255);
 			}
+			tinted[i].upload();
+		}
+	}
+
+	/** Reads one original glint and puts our copy in its place. False if it can't be read. */
+	private boolean load(Minecraft mc, int i) {
+		var resource = mc.getResourceManager().getResource(GLINTS[i]);
+		if (resource.isEmpty()) return false;
+		try (InputStream in = resource.get().open()) {
+			NativeImage image = NativeImage.read(in);
+			int[] pixels = new int[image.getWidth() * image.getHeight()];
+			for (int y = 0; y < image.getHeight(); y++) {
+				for (int x = 0; x < image.getWidth(); x++) {
+					int p = image.getPixel(x, y);
+					int lum = Math.max((p >> 16) & 0xFF, Math.max((p >> 8) & 0xFF, p & 0xFF));
+					pixels[y * image.getWidth() + x] = (p & 0xFF000000) | lum;
+				}
+			}
+			source[i] = pixels;
+			tinted[i] = new GlintTexture(image);
+			mc.getTextureManager().register(GLINTS[i], tinted[i]);
+			return true;
+		} catch (Exception e) {
+			// Leave the vanilla glint if the texture can't be read (e.g. a resource pack replaced it oddly).
+			return false;
 		}
 	}
 }
