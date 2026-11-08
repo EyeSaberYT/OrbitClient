@@ -22,6 +22,7 @@
 		"LevelRendererMixin",
 		"LivingEntityRendererMixin",
 		"LevelMixin",
+		"MinecraftAccountAccessor",
 		"MinecraftMixin",
 		"MouseHandlerMixin",
 		"MultiPlayerGameModeMixin",

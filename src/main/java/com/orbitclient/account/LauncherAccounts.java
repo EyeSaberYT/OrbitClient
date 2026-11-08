@@ -7,8 +7,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraft.client.Minecraft;
-import ru.vidtu.ias.IASMinecraft;
-import ru.vidtu.ias.auth.LoginData;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -85,7 +83,7 @@ public final class LauncherAccounts {
 			} catch (Exception e) {
 				throw new IllegalStateException(e);
 			}
-		}).thenCompose(tokens -> IASMinecraft.account(Minecraft.getInstance(), new LoginData(account.name(), account.uuid(), tokens.access, true))
+		}).thenCompose(tokens -> SessionSwitcher.switchTo(account.name(), account.uuid(), tokens.access)
 			.thenRun(() -> save(account, tokens)));
 	}
 

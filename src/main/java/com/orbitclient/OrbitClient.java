@@ -30,11 +30,6 @@ public class OrbitClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		// IAS supplies the session hand-off; Orbit owns the account-picker UI and reads the launcher's store.
-		ru.vidtu.ias.config.IASConfig.titleButton = false;
-		ru.vidtu.ias.config.IASConfig.serversButton = false;
-		ru.vidtu.ias.config.IASConfig.titleText = false;
-		ru.vidtu.ias.config.IASConfig.serversText = false;
 		// Minecraft starts Java headless, which leaves no clipboard for images. Turn that back off
 		// before anything asks AWT, so the Screenshot module can copy pictures without starting
 		// another program. Not on macOS: AWT there takes over the main thread GLFW needs.
