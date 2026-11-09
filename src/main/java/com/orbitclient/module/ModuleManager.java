@@ -18,6 +18,7 @@ public final class ModuleManager {
 	private static final List<Module> MODULES = new ArrayList<>();
 	private static final Map<Class<? extends Module>, Module> BY_CLASS = new HashMap<>();
 	private static final Map<Module, Boolean> KEY_WAS_DOWN = new HashMap<>();
+	private static List<HudModule> hudModules;
 
 	public static ScaledHudModule tabEditor;
 	public static ScaledHudModule titles;
@@ -61,6 +62,7 @@ public final class ModuleManager {
 		// Mechanic
 		register(DebugToggleModule.chunkBorders());
 		register(new CrosshairModule());
+		register(new DisplacementModule());
 		register(new FovChangerModule());
 		register(new FreelookModule());
 		register(new FullbrightModule());
@@ -90,11 +92,12 @@ public final class ModuleManager {
 		register(new ZoomModule());
 
 		MODULES.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+		hudModules = null;
 
 		// Lunar's defaults for a fresh install; saved profiles override these.
 		for (Class<? extends Module> type : List.of(ArmorStatusModule.class, BossBarModule.class, CoordinatesModule.class,
 			DirectionModule.class, FreelookModule.class, PotionEffectsModule.class, ScoreboardModule.class,
-			ToggleSprintModule.class, WaypointsModule.class, ZoomModule.class)) {
+			ToggleSprintModule.class, WaypointsModule.class, ZoomModule.class, DisplacementModule.class)) {
 			get(type).setDefaultEnabled(true);
 		}
 		tabEditor.setDefaultEnabled(true);
@@ -110,10 +113,14 @@ public final class ModuleManager {
 		return MODULES;
 	}
 
+	/** The HUD modules, built once: the HUD asks every frame, and the module list never changes after init. */
 	public static List<HudModule> hudModules() {
-		List<HudModule> list = new ArrayList<>();
-		for (Module module : MODULES) if (module instanceof HudModule hud) list.add(hud);
-		return list;
+		if (hudModules == null) {
+			List<HudModule> list = new ArrayList<>();
+			for (Module module : MODULES) if (module instanceof HudModule hud) list.add(hud);
+			hudModules = List.copyOf(list);
+		}
+		return hudModules;
 	}
 
 	@SuppressWarnings("unchecked")

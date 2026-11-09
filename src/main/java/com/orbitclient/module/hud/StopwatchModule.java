@@ -40,6 +40,15 @@ public class StopwatchModule extends TextHudModule {
 	@Override
 	protected String getText() {
 		long ms = elapsed + (running ? System.currentTimeMillis() - startTime : 0);
-		return String.format("%02d:%02d.%02d", ms / 60000, (ms / 1000) % 60, (ms / 10) % 100);
+		// Asked every frame; the text only changes every hundredth of a second.
+		long hundredths = ms / 10;
+		if (hundredths != shownHundredths || shownText == null) {
+			shownHundredths = hundredths;
+			shownText = String.format("%02d:%02d.%02d", ms / 60000, (ms / 1000) % 60, hundredths % 100);
+		}
+		return shownText;
 	}
+
+	private long shownHundredths = -1;
+	private String shownText;
 }

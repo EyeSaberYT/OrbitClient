@@ -7,6 +7,7 @@ import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.resources.Identifier;
 
 /**
@@ -15,7 +16,11 @@ import net.minecraft.resources.Identifier;
  */
 public final class Cosmetic {
 	static final Identifier WHITE = Identifier.fromNamespaceAndPath(OrbitClient.MOD_ID, "textures/cosmetics/white.png");
-	static final RenderType VOXELS = net.minecraft.client.renderer.rendertype.RenderTypes.entityCutoutNoCull(WHITE);
+
+	// Made on first draw, so the cosmetics can be loaded without the game's renderer (scripts/export-cosmetics).
+	private static final class Voxels {
+		static final RenderType TYPE = RenderTypes.entityCutoutNoCull(WHITE);
+	}
 
 	/** Everything a cosmetic needs to draw itself for one player this frame. */
 	public record Context(PoseStack pose, SubmitNodeCollector collector, int light, PlayerModel model,
@@ -32,7 +37,7 @@ public final class Cosmetic {
 		}
 
 		public void draw(VoxelModel voxels, int tint) {
-			collector.submitCustomGeometry(pose, VOXELS, (p, consumer) -> voxels.render(p, consumer, light, tint, 1f));
+			collector.submitCustomGeometry(pose, Voxels.TYPE, (p, consumer) -> voxels.render(p, consumer, light, tint, 1f));
 		}
 	}
 
@@ -53,6 +58,8 @@ public final class Cosmetic {
 	boolean iconPair;
 	/** Hats: how far (in blocks) the hat rises above the head, so the nametag can move up past it. */
 	float nameLift;
+	/** Whether it moves (capes animate, wings flap, pets bob); false for cosmetics that just sit still. */
+	boolean animated = true;
 
 	Cosmetic(String id, String name, CosmeticSlot slot, int defaultColor, boolean colorable, Renderer renderer, int capeFrames) {
 		this.id = id;

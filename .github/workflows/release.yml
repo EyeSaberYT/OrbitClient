@@ -1,5 +1,6 @@
-# Builds Orbit Client for each version tag (v1.2.3) and attaches the jar to a GitHub release.
-# Orbit Launcher downloads the newest release's jar.
+# Builds Orbit Client for each version tag (v1.2.3) and attaches one jar per Minecraft version to a GitHub
+# release, named orbit-client-<version>+<Minecraft version>.jar. Orbit Launcher (0.4.0 and newer) downloads
+# the newest release's jar for each instance's Minecraft version.
 name: Release
 
 on:
@@ -14,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Fabric Loom 1.19 runs on Java 25; the mod itself still targets Java 21.
+      # Fabric Loom 1.19 runs on Java 25 (so does Minecraft 26.x); older versions' jars target Java 21 or 17.
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -28,8 +29,9 @@ jobs:
         with:
           name: Orbit Client ${{ github.ref_name }}
           files: |
-            build/libs/orbit-client-*.jar
-            !build/libs/*-sources.jar
+            versions/*/build/libs/orbit-client-*.jar
+            !versions/*/build/libs/*-sources.jar
           body: |
-            Orbit Client for Minecraft 1.21.11 (Fabric). Needs Fabric API.
-            Orbit Launcher installs and updates it automatically.
+            Orbit Client for Fabric: one jar per Minecraft version (orbit-client-<version>+<Minecraft version>.jar), for
+            1.21.9, 1.21.10, 1.21.11, 26.1, 26.1.1, 26.1.2, 26.2 and 26.3. Needs Fabric API.
+            Orbit Launcher installs and updates it automatically, picking the jar for each instance's Minecraft version.

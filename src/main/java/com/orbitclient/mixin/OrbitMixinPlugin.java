@@ -30,6 +30,10 @@ public class OrbitMixinPlugin implements IMixinConfigPlugin {
 
 	@Override
 	public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+		//? if >=26.2 {
+		/*// Only SessionSwap uses it, and that's not in 26.2 and newer.
+		if (mixinClassName.endsWith(".MinecraftAccountAccessor")) return false;
+		*///?}
 		return true;
 	}
 

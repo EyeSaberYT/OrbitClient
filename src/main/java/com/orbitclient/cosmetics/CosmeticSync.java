@@ -14,9 +14,11 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -35,9 +37,13 @@ public final class CosmeticSync {
 		return t;
 	});
 	private static final long REFRESH_MS = 60_000;
+	private static long claimsAt;
+	private static long uploadRetryAt;
 
 	private static volatile String token;
 	private static volatile String tokenServer;
+	/** The account the token was issued to: switching accounts in-game needs a new one. */
+	private static volatile UUID tokenUser;
 	private static volatile String status = "";
 	private static volatile boolean uploadPending;
 	private static long uploadAt;
@@ -76,7 +82,8 @@ public final class CosmeticSync {
 		return status;
 	}
 
-	private static String server() {
+	/** The cosmetics (and friends) server's address, or null while it isn't known. */
+	public static String server() {
 		if (testServer != null) return testServer;
 		long now = System.currentTimeMillis();
 		if (!resolving && now - resolvedAt > (resolved == null ? 60_000 : RESOLVE_MS)) {
@@ -118,17 +125,25 @@ public final class CosmeticSync {
 		Minecraft mc = Minecraft.getInstance();
 		String server = server();
 		if (server == null || mc.level == null || mc.player == null || busy) return;
-		if (!server.equals(tokenServer)) {
-			token = null;
-			tokenServer = server;
+		if (!server.equals(tokenServer) || !mc.getUser().getProfileId().equals(tokenUser)) {
+			// Another server or another account (switched in-game): sign in again and upload this account's loadout.
 			uploadedOnce = false;
 			FETCHED.clear();
+			claimsAt = 0;
+			uploadRetryAt = 0;
+			CosmeticManager.setOwned(Set.of());
 		}
 		if (!uploadedOnce || (uploadPending && System.currentTimeMillis() >= uploadAt)) {
+			if (System.currentTimeMillis() < uploadRetryAt) return;
 			uploadPending = false;
 			uploadedOnce = true;
 			String body = CosmeticManager.own().toJson().toString();
 			run(() -> upload(server, body));
+			return;
+		}
+		if (System.currentTimeMillis() - claimsAt >= REFRESH_MS) {
+			claimsAt = System.currentTimeMillis();
+			run(() -> refreshClaims(server));
 			return;
 		}
 		if (++tickCounter % 100 != 0 || !ClientSettings.INSTANCE.showOthersCosmetics.isOn()) return;
@@ -163,6 +178,27 @@ public final class CosmeticSync {
 		return URI.create(server).getHost();
 	}
 
+	/**
+	 * A sign-in token for the current account on this server, signing in first when there's none
+	 * (or it was issued to another account or server). Null when signing in failed. Blocks: call it
+	 * off the game thread. Shared with the friends service.
+	 */
+	public static synchronized String token(String server) throws Exception {
+		UUID user = Minecraft.getInstance().getUser().getProfileId();
+		if (!server.equals(tokenServer) || !user.equals(tokenUser)) {
+			token = null;
+			tokenServer = server;
+			tokenUser = user;
+		}
+		if (token == null && !signIn(server)) return null;
+		return token;
+	}
+
+	/** The server answered 401 with this token: the next {@link #token} signs in again. */
+	public static synchronized void invalidate(String rejected) {
+		if (rejected != null && rejected.equals(token)) token = null;
+	}
+
 	/** Signs in: a one-time challenge, joinServer with Mojang, then the server checks it. */
 	private static boolean signIn(String server) throws Exception {
 		Minecraft mc = Minecraft.getInstance();
@@ -190,25 +226,82 @@ public final class CosmeticSync {
 		return true;
 	}
 
-	private static void upload(String server, String body) {
+	private static void upload(String server, String ignoredBody) {
 		try {
-			if (token == null && !signIn(server)) return;
 			for (int attempt = 0; attempt < 2; attempt++) {
+				String t = token(server);
+				if (t == null) {
+					uploadedOnce = false;
+					uploadRetryAt = System.currentTimeMillis() + 15_000;
+					return;
+				}
+				if (!refreshClaims(server, t)) {
+					uploadedOnce = false;
+					uploadRetryAt = System.currentTimeMillis() + 15_000;
+					return;
+				}
+				String body = CosmeticManager.own().toJson().toString();
 				HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/loadout")).timeout(Duration.ofSeconds(8))
-					.header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
+					.header("Authorization", "Bearer " + t).header("Content-Type", "application/json")
 					.PUT(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
 				if (r.statusCode() == 401 && attempt == 0) {
-					token = null;
-					if (!signIn(server)) return;
+					invalidate(t);
 					continue;
 				}
 				status = r.statusCode() == 200 ? "Synced: other Orbit Client players see your cosmetics"
 					: "Cosmetics server error (" + r.statusCode() + ")";
+				if (r.statusCode() == 503) status = "Claim verification is unavailable; your outfit was not synced";
+				if (r.statusCode() != 200) {
+					uploadPending = true;
+					uploadAt = System.currentTimeMillis() + 15_000;
+				}
 				return;
 			}
 		} catch (Exception e) {
 			status = "Can't reach the cosmetics server";
+			uploadedOnce = false;
+			uploadRetryAt = System.currentTimeMillis() + 15_000;
 		}
+	}
+
+	/** Fetch account-bound claims through the authenticated cosmetics-server token. */
+	private static boolean refreshClaims(String server) {
+		try {
+			String t = token(server);
+			return t != null && refreshClaims(server, t);
+		} catch (Exception e) {
+			status = "Can't verify cosmetic claims right now";
+			return false;
+		}
+	}
+
+	private static boolean refreshClaims(String server, String t) throws Exception {
+		HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/shop/claims")).timeout(Duration.ofSeconds(8))
+			.header("Authorization", "Bearer " + t).GET().build(), HttpResponse.BodyHandlers.ofString());
+		if (r.statusCode() == 401) {
+			invalidate(t);
+			status = "Sign in again to check cosmetic claims";
+			return false;
+		}
+		if (r.statusCode() != 200) {
+			status = r.statusCode() == 503 ? "Claim verification is unavailable" : "Cosmetics server error (" + r.statusCode() + ")";
+			return false;
+		}
+		JsonObject response = JsonParser.parseString(r.body()).getAsJsonObject();
+		Set<String> owned = new HashSet<>();
+		if (response.has("cosmetics") && response.get("cosmetics").isJsonArray()) {
+			response.getAsJsonArray("cosmetics").forEach(value -> {
+				if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) owned.add(value.getAsString());
+			});
+		}
+		CompletableFuture<Void> applied = new CompletableFuture<>();
+		Minecraft.getInstance().execute(() -> {
+			try { CosmeticManager.setOwned(owned); applied.complete(null); }
+			catch (Throwable error) { applied.completeExceptionally(error); }
+		});
+		applied.join();
+		claimsAt = System.currentTimeMillis();
+		return true;
 	}
 
 	private static void fetch(String server, List<UUID> uuids) {
@@ -222,16 +315,14 @@ public final class CosmeticSync {
 				HttpResponse.BodyHandlers.ofString());
 			if (r.statusCode() != 200) return;
 			JsonObject all = JsonParser.parseString(r.body()).getAsJsonObject();
-			HttpResponse<String> users = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/users?uuids=" + q)).timeout(Duration.ofSeconds(8)).GET().build(),
-				HttpResponse.BodyHandlers.ofString());
-			if (users.statusCode() == 200) {
-				for (var id : JsonParser.parseString(users.body()).getAsJsonObject().getAsJsonArray("users")) {
-					try { OrbitBadge.markUser(UUID.fromString(id.getAsString())); } catch (IllegalArgumentException ignored) { }
-				}
-			}
 			Minecraft mc = Minecraft.getInstance();
 			for (UUID u : uuids) {
-				var loadout = CosmeticManager.Loadout.fromJson(all.get(u.toString()));
+				var data = all.get(u.toString());
+				// The cosmetics service exposes known Orbit users through /loadouts; there is no
+				// /users route. A returned loadout (even an empty one) is the server-backed
+				// confirmation that this UUID has connected with Orbit Client.
+				if (data != null && !data.isJsonNull()) OrbitBadge.markUser(u);
+				var loadout = CosmeticManager.Loadout.fromJson(data);
 				mc.execute(() -> CosmeticManager.setOther(u, loadout));
 			}
 		} catch (Exception e) {

@@ -32,14 +32,18 @@ public class MotionBlurModule extends Module {
 		inMenus = add(new BooleanSetting("Blur With Menus Open", false));
 	}
 
+	/** One post-effect per strength, motion_blur_1 to motion_blur_10 (named once, not every frame). */
+	private static final Identifier[] SHADERS = java.util.stream.IntStream.rangeClosed(1, 10)
+		.mapToObj(level -> Identifier.fromNamespaceAndPath(OrbitClient.MOD_ID, "motion_blur_" + level))
+		.toArray(Identifier[]::new);
+
 	/** Called right after the world is rendered, before the HUD and menus. */
 	public static void apply(GraphicsResourceAllocator allocator) {
 		MotionBlurModule m = instance;
 		Minecraft mc = Minecraft.getInstance();
 		if (m == null || !m.isEnabled() || mc.level == null || (mc.screen != null && !m.inMenus.isOn())) return;
 		int level = Math.max(1, Math.min(10, (int) Math.round(m.strength.get())));
-		Identifier id = Identifier.fromNamespaceAndPath(OrbitClient.MOD_ID, "motion_blur_" + level);
-		PostChain chain = mc.getShaderManager().getPostChain(id, LevelTargetBundle.MAIN_TARGETS);
+		PostChain chain = mc.getShaderManager().getPostChain(SHADERS[level - 1], LevelTargetBundle.MAIN_TARGETS);
 		if (chain != null) chain.process(mc.getMainRenderTarget(), allocator);
 	}
 }

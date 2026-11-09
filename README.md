@@ -90,7 +90,7 @@ You need **JDK 25** to run the build tools (the mod itself targets Java 21).
 .\gradlew.bat build
 ```
 
-The jar is written to `build/libs/orbit-client-1.0.0.jar`. Put it in `.minecraft/mods` together with
+The jar is written to `build/libs/orbit-client-1.0.8.jar`. Put it in `.minecraft/mods` together with
 [Fabric API](https://modrinth.com/mod/fabric-api) for 1.21.11, using Fabric Loader 0.18.1 or newer.
 
 - `.\gradlew.bat runClient` starts a dev client.
@@ -112,23 +112,28 @@ The jar is written to `build/libs/orbit-client-1.0.0.jar`. Put it in `.minecraft
 Open **Orbit → Wardrobe** (hanger button in the dock). It works like the Orbit menu: you turn inside the eclipse
 core (drag to spin), the slots are arcs around it, and the slot's cosmetics orbit as nodes with their pictures.
 Hover a node to try it on, click to wear it (again to take it off); the panel shows a wear button and colors.
-All art is Orbit Client's own.
+Slots with more cosmetics than fit around the ring turn into a carousel: scroll (or ↑/↓) slides them around it.
+Type anywhere to search the slot (Backspace edits, Esc clears). All art is Orbit Client's own.
 
 | Slot | Cosmetics |
 |---|---|
-| Capes (animated, with cloth physics) | Eclipse, Galaxy, Inferno, Aurora, Tide, Neon Circuit, Sakura, Midnight |
-| Hats | Royal Crown, Halo, Cat Ears, Headphones, Top Hat |
-| Face | Bandana, Shades |
-| Back | Backpack, Blade Sheath |
-| Wings (flap faster when you sprint or fly) | Dragon, Angel, Mech |
-| Auras | Orbit, Rune Ring, Sparkles, Stardust Trail |
-| Pets (follow beside your shoulder) | Eclipse Wisp, Cube Buddy |
+| Capes (animated, with cloth physics) | Eclipse, Galaxy, Inferno, Aurora, Tide, Neon Circuit, Sakura, Midnight, Stormfront, Magma Flow, Prism Wave, Firefly Forest, Frostbite, Retrowave, Koi Pond, Honeycomb, Regal Velvet, Plasma Lamp |
+| Hats | Royal Crown, Halo, Cat Ears, Headphones, Top Hat, Starweaver Hat, Norse Helm, Knit Beanie, Chef's Toque, Sun Straw Hat, Ember Horns, Stag Antlers, Bunny Ears, Flower Crown, Propeller Cap, Astro Helmet, Samurai Kabuto, Corsair Tricorn, Toadstool Cap |
+| Face | Bandana, Shades, Prism Visor, Runed Mask, Monocle, Pixel Shades, Gas Mask, Sage Beard, Dapper Mustache, Eye Patch, Clown Nose, Ski Goggles, Heart Glasses, Retro 3D Glasses, Shinobi Mask, Kitsune Mask, Cyber Eye, Snorkel Mask |
+| Back | Backpack, Blade Sheath, Ion Jetpack, Wayfinder Quiver, Electric Guitar, Round Shield, Scroll Case, Party Balloon, Twin Katanas, Wanderer's Lantern, Turtle Shell, Angler's Rod, Hunter's Bow, Wind-up Key, Plush Bear, Crystal Pickaxe |
+| Wings (flap faster when you sprint or fly) | Dragon, Angel, Mech, Luna Moth, Voidfeather, Bat, Fairy, Phoenix, Bee, Crystal, Cyber, Leaf, Origami, Bone, Raven, Stained Glass |
+| Auras | Orbit, Rune Ring, Sparkles, Stardust Trail, Prism Orbit, Phoenix Circlet, Snowfall, Floating Hearts, Music Notes, Autumn Leaves, Bubbles, Storm Crackle, Rain Cloud, Void Motes, Planet Rings, Fireflies, Atom Orbit, Sleepy Zs |
+| Pets (follow beside your shoulder) | Eclipse Wisp, Cube Buddy, Moss Hopper, Pocket Drake, Pocket Cat, Pocket Fox, Axolotl, Bumble, Boo Ghost, Goo Drop, Hoot Owl, Mini Rocket, Jellyfish, Waddle Penguin, Duckling, Bolt Bot |
 
 Orbit Client players see each other's cosmetics through the cosmetics server in `server/` (see `server/README.md`).
 The client finds it through a DNS SRV record on minearcade.org, so no address is built into the mod and it isn't a
 setting. **Show Others' Cosmetics** turns other players' cosmetics off on your screen.
 
-Cape art is made by `tools/CosmeticGenerator.java`; models are voxel art in `cosmetics/Cosmetics.java`.
+Cape art is made by `tools/CosmeticGenerator.java` (`java -Djava.awt.headless=true tools/CosmeticGenerator.java
+src/main/resources/assets/orbitclient/textures/cosmetics/capes`); models are voxel art in `cosmetics/` (`Hats.java`,
+`Faces.java`, `Backs.java`, `Wings.java`, `Auras.java`, `Pets.java`, registered by `Cosmetics.java`).
+`.\gradlew.bat exportCosmetics -Pwebsite=<website public dir> -Psheets=<dir>` exports every cosmetic's picture and
+`data/cosmetics.json` for the website, plus contact sheets, from these same definitions (`scripts/export-cosmetics`).
 ## Crosshair
 
 Open it from Orbit: **Crosshair → Open Editor**. Laid out like Lunar Client's crosshair mod:

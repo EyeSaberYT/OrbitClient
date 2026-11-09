@@ -31,6 +31,14 @@ public class OrbitClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		MixinAudit.runIfRequested();
+		// The client starts on the render thread; laid-out text is only reused there.
+		com.orbitclient.util.TextLayoutCache.init(Thread.currentThread());
+		// Minecraft starts Java headless, which leaves no clipboard for images. Turn that back off
+		// before anything asks AWT, so the Screenshot module can copy pictures without starting
+		// another program. Not on macOS: AWT there takes over the main thread GLFW needs.
+		if (!System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac")) {
+			System.setProperty("java.awt.headless", "false");
+		}
 		// Before the keys register and options.txt loads, so rebinds from Eclipse Client carry over.
 		ConfigManager.migrateFromEclipse();
 		menuKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
@@ -53,6 +61,7 @@ public class OrbitClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			com.orbitclient.cosmetics.CosmeticManager.tickTrails();
 			com.orbitclient.cosmetics.CosmeticSync.tick();
+			com.orbitclient.social.Friends.tick();
 			com.orbitclient.cape.ClothCape.tickAll(client);
 		});
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {

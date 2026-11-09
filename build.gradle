@@ -39,10 +39,6 @@ if (project.hasProperty('mixinAudit')) {
 	loom.runs.client.vmArg '-Dorbit.mixinAudit=true'
 }
 
-// `gradlew :1.21.11:runClientGameTest -PperfTest` runs only PerformanceTest: what each mod costs per frame.
-if (project.hasProperty('perfTest')) {
-	tasks.matching { it.name == 'runClientGameTest' }.configureEach { it.jvmArgs '-Dorbit.perfTest=true' }
-}
 
 // Client game tests: `gradlew runClientGameTest` opens a world and screenshots the menus (run/screenshots).
 fabricApi {
@@ -52,6 +48,30 @@ fabricApi {
 		enableGameTests = false
 		enableClientGameTests = true
 	}
+}
+
+// `gradlew exportCosmetics -Pwebsite=<public dir> -Psheets=<dir>` exports every cosmetic's picture and a JSON list
+// (and contact sheets) from the mod's own cosmetic definitions; see scripts/export-cosmetics.
+// Compiles against the active version's sources (the cosmetics are drawn from the 1.21.11 code).
+if (stonecutter.current.active) {
+sourceSets {
+	exportCosmetics {
+		java.srcDir 'scripts/export-cosmetics/src'
+		compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+		runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+	}
+}
+
+tasks.register('exportCosmetics', JavaExec) {
+	description = 'Exports cosmetic pictures and data for the website (-Pwebsite=<public dir>) and contact sheets (-Psheets=<dir>).'
+	classpath = sourceSets.exportCosmetics.runtimeClasspath
+	mainClass = 'com.orbitclient.cosmetics.ExportCosmetics'
+	systemProperty 'java.awt.headless', 'true'
+	def website = providers.gradleProperty('website').getOrNull()
+	def sheets = providers.gradleProperty('sheets').getOrNull()
+	if (website != null) args '--website', website
+	if (sheets != null) args '--sheets', sheets
+}
 }
 
 // Names that changed between versions, rewritten in the sources for the version being built.
@@ -146,6 +166,14 @@ fabricApi {
 		['LivingEntityFeatureRendererRegistrationCallback', 'LivingEntityRenderLayerRegistrationCallback'],
 		// 26.1 added where a chat message came from.
 		['addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/GuiMessageTag;)V', 'addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageSource;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V'],
+		// Fabric API and Minecraft names for Orbit's home screen, Friends, heads and Screenshot commands.
+		['ClientCommandManager', 'ClientCommands'],
+		['PlayerFaceRenderer.draw(', 'PlayerFaceExtractor.extractRenderState('],
+		['PlayerFaceRenderer', 'PlayerFaceExtractor'],
+		['renderPanorama(', 'extractPanorama('],
+		['GLFW.GLFW_KEY_G', 'com.mojang.blaze3d.platform.InputConstants.KEY_G'],
+		['mc.player.displayClientMessage(message, true);', 'mc.player.sendOverlayMessage(message);'],
+		['RenderTypes.entityCutoutNoCull(', 'RenderTypes.entityCutout('],
 	])
 	// 26.2 split the in-game GUI into Gui (screens, chat) and Hud.
 	oneWay(v.matches('>=26.2'), [
@@ -169,6 +197,9 @@ fabricApi {
 		['@Mixin(Gui.class)', '@Mixin(Hud.class)'],
 		['method = "renderFire"', 'method = "submitFire"'],
 		['method = "renderHitOutline"', 'method = "submitHitOutline"'],
+		['mc.getToastManager()', 'mc.gui.toastManager()'],
+		// Opening a screen: 26.2 kept only setScreenAndShow (the home screen hook in MinecraftMixin).
+		['@ModifyVariable(method = "setScreen"', '@ModifyVariable(method = "setScreenAndShow"'],
 	])
 	// 26.3 moved the render API to com.mojang.renderpearl and renamed key input.
 	oneWay(v.matches('>=26.3'), [
@@ -179,8 +210,15 @@ fabricApi {
 		['return GLFW.glfwGetKey(Minecraft.getInstance().getWindow().handle(), key) == GLFW.GLFW_PRESS;', 'return com.mojang.blaze3d.platform.InputConstants.isKeyDown(key);'],
 		['Lcom/mojang/blaze3d/pipeline/RenderPipeline;', 'Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;'],
 		['GameRenderer;renderLevel(Lnet/minecraft/client/DeltaTracker;)V', 'GameRenderer;renderLevel()V'],
+		['com.mojang.authlib.yggdrasil.ProfileResult', 'com.mojang.authlib.services.ProfileResult'],
+	])
+	// 1.21.10 and older draw the cosmetics with RenderType's own factory (RenderTypes is new in 1.21.11).
+	oneWay(v.matches('<=1.21.10'), [
+		['import net.minecraft.client.renderer.rendertype.RenderTypes;', '// RenderTypes is new in 1.21.11'],
+		['RenderTypes.entityCutoutNoCull(', 'RenderType.entityCutoutNoCull('],
 	])
 	oneWay(unobfuscated && v.matches('<26.3'), [
+		['new OptionsScreen(this, minecraft.options)', 'new OptionsScreen(this, minecraft.options, false)'],
 		['return GLFW.glfwGetKey(Minecraft.getInstance().getWindow().handle(), key) == GLFW.GLFW_PRESS;', 'return com.mojang.blaze3d.platform.InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), key);'],
 	])
 }
@@ -204,4 +242,14 @@ tasks.withType(JavaCompile).configureEach {
 java {
 	sourceCompatibility = JavaVersion.toVersion(javaVersion)
 	targetCompatibility = JavaVersion.toVersion(javaVersion)
+}
+
+// `gradlew runClientGameTest -PperfTest` runs only PerformanceTest: where frame time goes.
+if (project.hasProperty('perfTest')) {
+	// The game-test network synchronizer keeps client and server in lockstep, which a frame-rate test doesn't need,
+	// and it stops the server when the client-side players this test adds change what it tracks.
+	tasks.matching { it.name == 'runClientGameTest' }.configureEach {
+		it.jvmArgs '-Dorbit.perfTest=true', '-Dfabric.client.gametest.disableNetworkSynchronizer=true'
+		if (project.hasProperty('perfBenchmarkOnly')) it.jvmArgs '-Dorbit.perfBenchmarkOnly=true'
+	}
 }

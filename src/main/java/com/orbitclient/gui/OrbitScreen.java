@@ -56,6 +56,7 @@ public class OrbitScreen extends Screen {
 		new DockItem("waypoints", "Waypoints", Panel.WAYPOINTS),
 		new DockItem("ui_settings", "Settings", Panel.SETTINGS),
 		new DockItem("ui_wardrobe", "Wardrobe", null),
+		new DockItem("chat", "Friends", null),
 		new DockItem("ui_hud", "Edit HUD", null),
 		new DockItem("ui_close", "Close", null),
 	};
@@ -855,6 +856,7 @@ public class OrbitScreen extends Screen {
 			if (item.panel != null) openPanel(item.panel);
 			else if (item.icon.equals("ui_hud")) closeThen(() -> minecraft.setScreen(new HudEditorScreen()));
 			else if (item.icon.equals("ui_wardrobe")) closeThen(() -> minecraft.setScreen(new WardrobeScreen()));
+			else if (item.icon.equals("chat")) closeThen(() -> minecraft.setScreen(new FriendsScreen()));
 			else onClose();
 			return true;
 		}

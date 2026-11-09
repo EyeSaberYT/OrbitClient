@@ -1,11 +1,11 @@
 {
 	"schemaVersion": 1,
 	"id": "orbitclient-test",
-	"version": "1.0.0",
+	"version": "1.0.8",
 	"name": "Orbit Client Tests",
 	"environment": "client",
 	"entrypoints": {
-		"fabric-client-gametest": ["com.orbitclient.test.MenuScreenshotTest", "com.orbitclient.test.CapeMotionTest", "com.orbitclient.test.PerformanceTest"]
+		"fabric-client-gametest": ["com.orbitclient.test.SessionSwitchTest", "com.orbitclient.test.GlintColorizerTest", "com.orbitclient.test.MenuScreenshotTest", "com.orbitclient.test.CapeMotionTest", "com.orbitclient.test.PerformanceTest"]
 	},
 	"depends": {
 		"orbitclient": "*"

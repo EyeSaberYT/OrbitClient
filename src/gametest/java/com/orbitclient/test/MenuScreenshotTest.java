@@ -2,6 +2,7 @@ package com.orbitclient.test;
 
 import com.orbitclient.gui.CrosshairEditorScreen;
 import com.orbitclient.gui.HudEditorScreen;
+import com.orbitclient.gui.OrbitHomeScreen;
 import com.orbitclient.gui.OrbitScreen;
 import com.orbitclient.module.ModuleManager;
 import com.orbitclient.module.hud.CoordinatesModule;
@@ -44,6 +45,56 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 	public void runTest(ClientGameTestContext context) {
 		if (Boolean.getBoolean("orbit.perfTest")) return;  // a PerformanceTest run
 		context.getInput().resizeWindow(1600, 900);
+		context.waitTicks(40);
+		context.takeScreenshot("orbit-00-home");
+		context.getInput().setCursorPos(800, 470);
+		context.waitTicks(10);
+		context.takeScreenshot("orbit-00-home-hover");
+		// The account chip in the top right opens the account popup; Escape closes it.
+		context.getInput().setCursorPos(1400, 62);
+		context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		context.waitTicks(10);
+		context.takeScreenshot("orbit-00-home-accounts");
+		context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+		context.waitTicks(5);
+		// Friends: sample data as the server would send it (the test account can't sign in).
+		java.util.UUID alex = java.util.UUID.fromString("853c80ef-3c37-49fd-aa49-938b674adae6");
+		java.util.UUID steve = java.util.UUID.fromString("069a79f4-44e9-4726-a5be-fca90e38aaf5");
+		context.runOnClient(mc -> {
+			String me = mc.getUser().getProfileId().toString();
+			long now = System.currentTimeMillis();
+			com.orbitclient.social.Friends.loadForTest(com.google.gson.JsonParser.parseString("""
+				{"friends":[
+				  {"uuid":"%s","name":"jeb_","online":true,"server":"farms.minearcade.org"},
+				  {"uuid":"%s","name":"Notch","online":true,"server":"singleplayer"},
+				  {"uuid":"61699b2e-d327-4a01-9f1e-0ea8c3f06bc6","name":"Dinnerbone","online":false,"server":""}],
+				 "incoming":[{"uuid":"0d7df8b4-5d6a-4c23-8a9c-ff9e1b6b4b8f","name":"Grumm"}],
+				 "outgoing":[], "blocked":[],
+				 "messages":[
+				  {"id":1,"from":"%s","to":"%s","text":"you on the farms server?","time":%d},
+				  {"id":2,"from":"%s","to":"%s","text":"yeah, come join! bring a few stacks of bonemeal, the wheat farm is almost done","time":%d}],
+				 "lastMessage":2}
+				""".formatted(alex, steve, me, alex, now - 120000, alex, me, now - 60000)).getAsJsonObject());
+		});
+		context.setScreen(com.orbitclient.gui.OrbitHomeScreen::new);
+		context.waitTicks(15);
+		context.takeScreenshot("orbit-00-home-friends");
+		context.setScreen(com.orbitclient.gui.FriendsScreen::new);
+		context.waitTicks(10);
+		context.takeScreenshot("orbit-00-friends-list");
+		context.setScreen(() -> new com.orbitclient.gui.FriendsScreen(alex));
+		context.waitTicks(10);
+		context.takeScreenshot("orbit-00-friends-chat");
+		context.setScreen(() -> null);
+		context.waitTicks(5);
+		// Closing a screen outside a world comes back to the Orbit home screen, not the vanilla one.
+		context.setScreen(OrbitScreen::new);
+		context.waitTicks(5);
+		context.setScreen(() -> null);
+		context.waitTicks(5);
+		context.runOnClient(mc -> {
+			if (!(mc.screen instanceof OrbitHomeScreen)) throw new AssertionError("Closing a screen showed " + mc.screen + ", not the Orbit home screen");
+		});
 		try (TestSingleplayerContext sp = context.worldBuilder().create()) {
 			sp.getClientWorld().waitForChunksRender();
 			context.runOnClient(mc -> {
@@ -237,6 +288,14 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 			sp.getServer().runCommand("damage @e[type=husk,limit=1] 1");
 			context.waitTicks(1);
 			context.takeScreenshot("orbit-13d-new-mods-world");
+			// Glint Colorizer's All Items: the unenchanted sword, gold and log glint too.
+			Runnable toggleAllItems = () -> context.runOnClient(mc -> ModuleManager.get(com.orbitclient.module.visual.GlintColorizerModule.class).getSettings().stream()
+				.filter(s -> s.getName().equals("All Items")).findFirst()
+				.ifPresent(s -> ((com.orbitclient.setting.BooleanSetting) s).toggle()));
+			toggleAllItems.run();
+			context.waitTicks(2);
+			context.takeScreenshot("orbit-13d2-glint-all-items");
+			toggleAllItems.run();
 			context.runOnClient(mc -> {
 				for (int i = 0; i < 3; i++) mc.gui.getChat().addMessage(net.minecraft.network.chat.Component.literal("Spam message"));
 				var chat = (com.orbitclient.mixin.ChatComponentAccessor) mc.gui.getChat();
@@ -302,6 +361,23 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 				{"midnight", null, null, null, null, null, "sword_sheath"},
 				{"midnight", null, "prism_visor", "prism_orbit", "moss_frog", "butterfly_wings", "jetpack"},
 				{"sakura", null, "rune_mask", "phoenix_crown", "ember_drake", "void_wings", "quiver"},
+				{"stormfront", "wizard_hat", "monocle", "snowfall", "pet_cat", "phoenix_wings", null},
+				{"retrowave", "astro_helmet", null, "planet_rings", "pet_rocket", null, "wind_up_key"},
+				{"koi_pond", "viking_helm", "sage_beard", "rain_cloud", "pet_owl", null, "round_shield"},
+				{"magma", "bunny_ears", "heart_glasses", "heart_float", "pet_axolotl", "fairy_wings", null},
+				{"regal", "kabuto", "kitsune_mask", "music_notes", "pet_jellyfish", null, "twin_katanas"},
+				{"frostbite", "propeller_cap", "ski_goggles", "bubbles", "pet_bee", "bat_wings", null},
+				{"hive", "straw_hat", "handlebar", "fireflies", "pet_penguin", null, "party_balloon"},
+				{"plasma", "antlers", "gas_mask", "atom_orbit", "pet_robot", "crystal_wings", null},
+				{"prism_wave", "tricorn", "eye_patch", "autumn_leaves", "pet_fox", null, "fishing_rod"},
+				{"firefly_forest", "flower_crown", "clown_nose", "sleepy_zzz", "pet_ghost", "leaf_wings", null},
+				{null, "toadstool", "cyber_eye", "ender_motes", "pet_goo", "cyber_wings", "electric_guitar"},
+				{null, "chef_hat", "snorkel", "storm_crackle", "pet_duckling", "origami_wings", "scroll_case"},
+				{null, "beanie", "pixel_shades", null, null, "stained_glass_wings", "wanderer_lantern"},
+				{null, "ember_horns", "shinobi_mask", null, null, "bone_wings", "turtle_shell"},
+				{null, null, "retro_3d_glasses", null, null, "raven_wings", "hunters_bow"},
+				{null, null, null, null, null, "bee_wings", "plush_bear"},
+				{null, null, null, null, null, null, "crystal_pickaxe"},
 			};
 			context.runOnClient(mc -> com.orbitclient.module.visual.WaveyCapesModule.testCape = null);
 			for (int o = 0; o < outfits.length; o++) {
@@ -345,6 +421,12 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((com.orbitclient.gui.WardrobeScreen) mc.screen).showTab(com.orbitclient.cosmetics.CosmeticSlot.WINGS));
 			context.waitTicks(30);
 			context.takeScreenshot("orbit-33-wardrobe-wings");
+			context.runOnClient(mc -> ((com.orbitclient.gui.WardrobeScreen) mc.screen).showTab(com.orbitclient.cosmetics.CosmeticSlot.BACK));
+			context.waitTicks(30);
+			context.takeScreenshot("orbit-34-wardrobe-back");
+			context.runOnClient(mc -> ((com.orbitclient.gui.WardrobeScreen) mc.screen).searchFor("ha"));
+			context.waitTicks(20);
+			context.takeScreenshot("orbit-35-wardrobe-search");
 			context.setScreen(() -> null);
 			context.runOnClient(mc -> {
 				for (var slot : com.orbitclient.cosmetics.CosmeticSlot.values()) com.orbitclient.cosmetics.CosmeticManager.remove(slot);
