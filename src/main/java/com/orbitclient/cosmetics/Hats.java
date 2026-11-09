@@ -1,5 +1,6 @@
 package com.orbitclient.cosmetics;
 
+import com.orbitclient.util.PoseUtil;
 import com.orbitclient.cosmetics.VoxelModel.Paint;
 import com.mojang.math.Axis;
 
@@ -34,7 +35,7 @@ final class Hats {
 		add("halo", "Halo", CosmeticSlot.HAT, 0xFFFFE89A, true, ctx -> {
 			ctx.attach(ctx.model().head);
 			ctx.pose().translate(0, (-12.5f + (float) Math.sin(ctx.time() * 2.2) * 0.6f) / 16f, 0);
-			ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (ctx.time() * 25 % 360)));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (ctx.time() * 25 % 360)));
 			ctx.draw(halo);
 			ctx.pose().popPose();
 		});
@@ -47,7 +48,7 @@ final class Hats {
 			ctx.attach(ctx.model().head);
 			// A small twitch every few seconds.
 			float twitch = (float) Math.max(0, Math.sin(ctx.time() * 1.3) - 0.9) * 60f;
-			ctx.pose().mulPose(Axis.XP.rotationDegrees(-twitch * 0.3f));
+			PoseUtil.mulPose(ctx.pose(), Axis.XP.rotationDegrees(-twitch * 0.3f));
 			ctx.draw(catEars);
 			ctx.pose().popPose();
 		});
@@ -235,8 +236,8 @@ final class Hats {
 		add("bunny_ears", "Bunny Ears", CosmeticSlot.HAT, 0xFFF4F1EA, true, ctx -> {
 			ctx.attach(ctx.model().head);
 			float twitch = (float) Math.max(0, Math.sin(ctx.time() * 1.1) - 0.85) * 50f;
-			ctx.pose().mulPose(Axis.ZP.rotationDegrees((float) Math.sin(ctx.time() * 1.6) * 2.5f));
-			ctx.pose().mulPose(Axis.XP.rotationDegrees(-twitch * 0.35f));
+			PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees((float) Math.sin(ctx.time() * 1.6) * 2.5f));
+			PoseUtil.mulPose(ctx.pose(), Axis.XP.rotationDegrees(-twitch * 0.35f));
 			ctx.draw(bunny);
 			ctx.pose().popPose();
 		});
@@ -280,7 +281,7 @@ final class Hats {
 		add("propeller_cap", "Propeller Cap", CosmeticSlot.HAT, 0xFF3FB8FF, true, ctx -> {
 			ctx.attach(ctx.model().head);
 			ctx.draw(capBody);
-			ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (ctx.time() * 400 % 360)));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (ctx.time() * 400 % 360)));
 			ctx.draw(propeller);
 			ctx.pose().popPose();
 		});

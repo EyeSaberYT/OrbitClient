@@ -4,8 +4,29 @@ pluginManagement {
 			name = 'Fabric'
 			url = 'https://maven.fabricmc.net/'
 		}
+		maven {
+			name = 'KikuGie Releases'
+			url = 'https://maven.kikugie.dev/releases/'
+		}
 		mavenCentral()
 		gradlePluginPortal()
+	}
+}
+
+plugins {
+	id 'dev.kikugie.stonecutter' version '0.9.8'
+	id 'dev.kikugie.loom-back-compat' version '0.4.2'
+}
+
+// One source tree, one jar per Minecraft version (Stonecutter). The shared src/ is in the
+// state of the active version set in stonecutter.gradle.
+stonecutter {
+	kotlinController = false
+	centralScript = 'build.gradle'
+	create(getRootProject()) {
+		// The versions that build and start. Still being ported, so not built yet: 1.16.5, 1.17.1, 1.18.2, 1.19.2,
+		// 1.19.3, 1.19.4, 1.20 to 1.20.6, 1.21, 1.21.1, 1.21.3 to 1.21.8 (their folders in versions/ are kept).
+		versions '1.21.9', '1.21.10', '1.21.11', '26.1', '26.1.1', '26.1.2', '26.2', '26.3'
 	}
 }
 

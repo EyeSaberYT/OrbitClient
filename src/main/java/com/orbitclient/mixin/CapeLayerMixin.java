@@ -8,11 +8,11 @@ import com.orbitclient.module.visual.WaveyCapesModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.CapeLayer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.resources.model.EquipmentClientInfo;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
@@ -63,7 +63,7 @@ public abstract class CapeLayerMixin extends RenderLayer<AvatarRenderState, Play
 		getParentModel().root().translateAndRotate(pose);
 		getParentModel().body.translateAndRotate(pose);
 		pose.translate(0, 0, 2f / 16f); // from the neck pivot out to the back
-		collector.submitCustomGeometry(pose, RenderTypes.entityCutoutNoCull(texture),
+		collector.submitCustomGeometry(pose, net.minecraft.client.renderer.rendertype.RenderTypes.entityCutoutNoCull(texture),
 			(entry, consumer) -> CapeMesh.draw(entry, consumer, points, light, smooth));
 		pose.popPose();
 	}

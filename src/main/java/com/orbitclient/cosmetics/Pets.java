@@ -1,5 +1,6 @@
 package com.orbitclient.cosmetics;
 
+import com.orbitclient.util.PoseUtil;
 import com.orbitclient.cosmetics.VoxelModel.Paint;
 import com.mojang.math.Axis;
 
@@ -26,8 +27,8 @@ final class Pets {
 			pet(ctx, () -> {
 				ctx.draw(wisp);
 				ctx.pose().pushPose();
-				ctx.pose().mulPose(Axis.XP.rotationDegrees(70));
-				ctx.pose().mulPose(Axis.ZP.rotationDegrees((float) (ctx.time() * 120 % 360)));
+				PoseUtil.mulPose(ctx.pose(), Axis.XP.rotationDegrees(70));
+				PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees((float) (ctx.time() * 120 % 360)));
 				ctx.draw(wispRing);
 				ctx.pose().popPose();
 			});
@@ -91,7 +92,7 @@ final class Pets {
 				return ((x + y + z) % 5 == 0) ? '%' : '#';
 			});
 		add("ember_drake", "Pocket Drake", CosmeticSlot.PET, 0xFFEA7750, true, ctx -> pet(ctx, () -> {
-			ctx.pose().mulPose(Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 0.8) * 10));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 0.8) * 10));
 			ctx.draw(miniDrake);
 		}));
 		icon("ember_drake", miniDrake, false);
@@ -159,7 +160,7 @@ final class Pets {
 		};
 		VoxelModel axoModel = VoxelModel.centered(0.6f, axoPaint, 9, 5, 12, axolotl);
 		add("pet_axolotl", "Axolotl", CosmeticSlot.PET, 0xFFF7A1C4, true, ctx -> pet(ctx, () -> {
-			ctx.pose().mulPose(Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 4) * 12));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 4) * 12));
 			ctx.draw(axoModel);
 		}));
 		icon("pet_axolotl", axoModel, false);
@@ -194,7 +195,7 @@ final class Pets {
 			for (int side = -1; side <= 1; side += 2) {
 				ctx.pose().pushPose();
 				at(ctx.pose(), side * 1.3, -1.6, -0.2);
-				ctx.pose().mulPose(Axis.ZP.rotationDegrees(side * (-15 - buzz)));
+				PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees(side * (-15 - buzz)));
 				if (side < 0) ctx.pose().scale(-1, 1, 1);
 				ctx.draw(wing);
 				ctx.pose().popPose();
@@ -223,7 +224,7 @@ final class Pets {
 		}
 		add("pet_ghost", "Boo Ghost", CosmeticSlot.PET, 0xFFF2F4FF, true, ctx -> pet(ctx, () -> {
 			int f = (int) (ctx.time() * 3) % 2;
-			ctx.pose().mulPose(Axis.ZP.rotationDegrees((float) Math.sin(ctx.time() * 1.3) * 6));
+			PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees((float) Math.sin(ctx.time() * 1.3) * 6));
 			ctx.draw(blink(ctx, 3.5) ? ghostBlink[f] : ghost[f]);
 		}));
 		icon("pet_ghost", ghost[0], false);
@@ -277,7 +278,7 @@ final class Pets {
 		add("pet_owl", "Hoot Owl", CosmeticSlot.PET, 0xFF8B6A4E, true, ctx -> pet(ctx, () -> {
 			double t = ctx.time() % 6;
 			float tilt = t > 4 && t < 5.5 ? (float) Math.sin((t - 4) / 1.5 * Math.PI) * 20 : 0;
-			ctx.pose().mulPose(Axis.ZP.rotationDegrees(tilt));
+			PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees(tilt));
 			ctx.draw(blink(ctx, 3.1) ? owlBlink : owlModel);
 		}));
 		icon("pet_owl", owlModel, false);
@@ -311,7 +312,7 @@ final class Pets {
 			return x == 2 && z == 2 || y == 10 && (x == 2 || z == 2) && Math.abs(x - 2) + Math.abs(z - 2) <= 1 ? (y == 10 ? 'F' : 'f') : '.';
 		});
 		add("pet_rocket", "Mini Rocket", CosmeticSlot.PET, 0xFFE5484D, true, ctx -> pet(ctx, () -> {
-			ctx.pose().mulPose(Axis.ZP.rotationDegrees((float) Math.sin(ctx.time() * 1.4) * 8));
+			PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees((float) Math.sin(ctx.time() * 1.4) * 8));
 			ctx.draw(rocket);
 			float flick = 0.75f + 0.35f * (float) Math.abs(Math.sin(ctx.time() * 23));
 			ctx.pose().translate(0, 3.5f / 16f, 0);
@@ -420,7 +421,7 @@ final class Pets {
 			return c;
 		});
 		add("pet_robot", "Bolt Bot", CosmeticSlot.PET, 0xFF3FE0FF, true, ctx -> pet(ctx, () -> {
-			ctx.pose().mulPose(Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 2.2) * 15));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 2.2) * 15));
 			ctx.draw(ctx.time() % 1.6 < 0.8 ? botModel : botBlink);
 		}));
 		icon("pet_robot", botModel, false);

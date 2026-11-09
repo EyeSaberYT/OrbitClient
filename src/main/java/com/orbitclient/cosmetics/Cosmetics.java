@@ -1,5 +1,6 @@
 package com.orbitclient.cosmetics;
 
+import com.orbitclient.util.PoseUtil;
 import com.orbitclient.cosmetics.VoxelModel.Paint;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
@@ -194,8 +195,8 @@ public final class Cosmetics {
 			// Swept back and slightly up, flapping around the hinge.
 			float phase = side < 0 ? 0.22f : 0f;
 			float localFlap = (float) (Math.sin(ctx.time() * speed + phase) * (active ? 3.5 : 1.2) * flapScale);
-			ctx.pose().mulPose(Axis.YP.rotationDegrees(side * (-28f - flap)));
-			ctx.pose().mulPose(Axis.ZP.rotationDegrees(side * (-12f + localFlap)));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees(side * (-28f - flap)));
+			PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees(side * (-12f + localFlap)));
 			if (side < 0) ctx.pose().scale(-1, 1, 1);
 			ctx.draw(wing);
 			ctx.pose().popPose();
@@ -211,7 +212,7 @@ public final class Cosmetics {
 		ctx.model().root().translateAndRotate(ctx.pose());
 		ctx.pose().translate((float) offset.x, (float) offset.y, (float) offset.z);
 		ctx.pose().translate(0, (float) Math.sin(ctx.time() * 2.4) * 0.06f, 0);
-		ctx.pose().mulPose(Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 0.9) * 25f));
+		PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) Math.sin(ctx.time() * 0.9) * 25f));
 		draw.run();
 		ctx.pose().popPose();
 	}

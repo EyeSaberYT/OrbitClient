@@ -1,5 +1,6 @@
 package com.orbitclient.cosmetics;
 
+import com.orbitclient.util.PoseUtil;
 import com.orbitclient.cosmetics.VoxelModel.Paint;
 import com.mojang.math.Axis;
 
@@ -19,7 +20,7 @@ final class Auras {
 				double a = ctx.time() * 1.6 + i * Math.PI * 2 / 3;
 				ctx.pose().pushPose();
 				ctx.pose().translate((float) Math.cos(a) * 11 / 16f, (8 + (float) Math.sin(a * 2 + i) * 2.5f) / 16f, (float) Math.sin(a) * 11 / 16f);
-				ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (ctx.time() * 90 % 360)));
+				PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (ctx.time() * 90 % 360)));
 				ctx.draw(orb);
 				ctx.pose().popPose();
 			}
@@ -39,7 +40,7 @@ final class Auras {
 			ctx.pose().pushPose();
 			ctx.model().root().translateAndRotate(ctx.pose());
 			ctx.pose().translate(0, 23.6f / 16f, 0);
-			ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (ctx.time() * 20 % 360)));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (ctx.time() * 20 % 360)));
 			ctx.draw(runeRing);
 			ctx.pose().popPose();
 		});
@@ -91,7 +92,7 @@ final class Auras {
 				double a = ctx.time() * 0.9 + i * Math.PI / 2;
 				ctx.pose().pushPose();
 				ctx.pose().translate((float) Math.cos(a) * 10 / 16f, (5 + (float) Math.sin(a * 1.5) * 5) / 16f, (float) Math.sin(a) * 7 / 16f);
-				ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (-ctx.time() * 55 % 360)));
+				PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (-ctx.time() * 55 % 360)));
 				ctx.draw(crystal);
 				ctx.pose().popPose();
 			}
@@ -110,7 +111,7 @@ final class Auras {
 			ctx.pose().pushPose();
 			ctx.model().root().translateAndRotate(ctx.pose());
 			ctx.pose().translate(0, 22.5f / 16f, 0);
-			ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (ctx.time() * 16 % 360)));
+			PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (ctx.time() * 16 % 360)));
 			ctx.draw(flameHalo);
 			ctx.pose().popPose();
 		});
@@ -122,7 +123,7 @@ final class Auras {
 		add("snowfall", "Snowfall", CosmeticSlot.AURA, 0xFFBFE6FF, true, ctx -> motes(ctx, 14, 0.25, (pose, life, a, b, c, i) -> {
 			double ang = a * Math.PI * 2, r = 6 + b * 8;
 			at(pose, Math.cos(ang) * r + Math.sin(life * 9 + i) * 1.5, -14 + life * 38, Math.sin(ang) * r);
-			pose.mulPose(Axis.YP.rotationDegrees((float) (life * 400 + c * 360)));
+			PoseUtil.mulPose(pose, Axis.YP.rotationDegrees((float) (life * 400 + c * 360)));
 			float s = fade(life, 0.1) * (0.7f + (float) c * 0.5f);
 			pose.scale(s, s, s);
 			return flake;
@@ -135,7 +136,7 @@ final class Auras {
 		add("heart_float", "Floating Hearts", CosmeticSlot.AURA, 0xFFFF4D7A, true, ctx -> motes(ctx, 8, 0.3, (pose, life, a, b, c, i) -> {
 			double ang = a * Math.PI * 2, r = 7 + b * 5;
 			at(pose, Math.cos(ang) * r + Math.sin(life * 6 + i) * 1.2, 16 - life * 28, Math.sin(ang) * r);
-			pose.mulPose(Axis.YP.rotationDegrees((float) (-Math.toDegrees(ang) + 90)));
+			PoseUtil.mulPose(pose, Axis.YP.rotationDegrees((float) (-Math.toDegrees(ang) + 90)));
 			float s = fade(life, 0.15) * (0.8f + 0.12f * (float) Math.sin(ctx.time() * 7 + i));
 			pose.scale(s, s, s);
 			return heart;
@@ -155,7 +156,7 @@ final class Auras {
 				double a = t * 0.8 + i * Math.PI / 2;
 				ctx.pose().pushPose();
 				at(ctx.pose(), Math.cos(a) * 10, -5 + Math.sin(t * 2 + i * 1.7) * 2.5, Math.sin(a) * 10);
-				ctx.pose().mulPose(Axis.YP.rotationDegrees((float) (-Math.toDegrees(a) + 90)));
+				PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) (-Math.toDegrees(a) + 90)));
 				ctx.pose().scale(beat, beat, beat);
 				ctx.draw(i % 2 == 0 ? note : notes);
 				ctx.pose().popPose();
@@ -173,8 +174,8 @@ final class Auras {
 		add("autumn_leaves", "Autumn Leaves", CosmeticSlot.AURA, 0xFFE8742C, false, ctx -> motes(ctx, 10, 0.22, (pose, life, a, b, c, i) -> {
 			double ang = a * Math.PI * 2 + life * 1.5, r = 6 + b * 8;
 			at(pose, Math.cos(ang) * r, -12 + life * 36 + Math.sin(life * 12) * 1.2, Math.sin(ang) * r);
-			pose.mulPose(Axis.YP.rotationDegrees((float) (c * 360 + life * 200)));
-			pose.mulPose(Axis.ZP.rotationDegrees((float) Math.sin(life * 12 + i) * 50));
+			PoseUtil.mulPose(pose, Axis.YP.rotationDegrees((float) (c * 360 + life * 200)));
+			PoseUtil.mulPose(pose, Axis.ZP.rotationDegrees((float) Math.sin(life * 12 + i) * 50));
 			float s = fade(life, 0.1);
 			pose.scale(s, s, s);
 			return autumn[i % 3];
@@ -205,7 +206,7 @@ final class Auras {
 				if (life > 0.16 || (int) (life * 40) % 2 == 1) return null;
 				double ang = a * Math.PI * 2, r = 9 + b * 3;
 				at(pose, Math.cos(ang) * r, -2 + c * 16, Math.sin(ang) * r);
-				pose.mulPose(Axis.YP.rotationDegrees((float) (c * 360)));
+				PoseUtil.mulPose(pose, Axis.YP.rotationDegrees((float) (c * 360)));
 				pose.scale(1.4f, 1.4f, 1.4f);
 				return bolt;
 			});
@@ -250,7 +251,7 @@ final class Auras {
 		add("ender_motes", "Void Motes", CosmeticSlot.AURA, 0xFFB04CFF, true, ctx -> motes(ctx, 18, 0.6, (pose, life, a, b, c, i) -> {
 			double ang = a * Math.PI * 2 + life * 4, r = 14 * (1 - life) + 2;
 			at(pose, Math.cos(ang) * r, (b * 26 - 8) * (1 - life) + 6 * life, Math.sin(ang) * r);
-			pose.mulPose(Axis.YP.rotationDegrees((float) (life * 720)));
+			PoseUtil.mulPose(pose, Axis.YP.rotationDegrees((float) (life * 720)));
 			float s = fade(life, 0.2) * (0.8f + (float) c * 0.6f);
 			pose.scale(s, s, s);
 			return i % 3 == 0 ? moteDark : moteLight;
@@ -276,8 +277,8 @@ final class Auras {
 			at(ctx.pose(), 0, 9, 0);
 			for (int k = 0; k < 2; k++) {
 				ctx.pose().pushPose();
-				ctx.pose().mulPose(k == 0 ? Axis.XP.rotationDegrees(18) : Axis.ZP.rotationDegrees(-24));
-				ctx.pose().mulPose(Axis.YP.rotationDegrees((float) ((k == 0 ? t * 22 : -t * 30) % 360)));
+				PoseUtil.mulPose(ctx.pose(), k == 0 ? Axis.XP.rotationDegrees(18) : Axis.ZP.rotationDegrees(-24));
+				PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees((float) ((k == 0 ? t * 22 : -t * 30) % 360)));
 				ctx.draw(k == 0 ? bandA : bandB);
 				at(ctx.pose(), k == 0 ? 10 : 7.9, 0.5, 0);
 				ctx.draw(moon);
@@ -319,8 +320,8 @@ final class Auras {
 			at(ctx.pose(), 0, 6, 0);
 			for (int k = 0; k < 3; k++) {
 				ctx.pose().pushPose();
-				ctx.pose().mulPose(Axis.YP.rotationDegrees(k * 60));
-				ctx.pose().mulPose(Axis.XP.rotationDegrees(65));
+				PoseUtil.mulPose(ctx.pose(), Axis.YP.rotationDegrees(k * 60));
+				PoseUtil.mulPose(ctx.pose(), Axis.XP.rotationDegrees(65));
 				ctx.draw(orbitPath);
 				double a = t * 3 + k * 2.1;
 				at(ctx.pose(), Math.cos(a) * 12, 0.25, Math.sin(a) * 12);
@@ -335,7 +336,7 @@ final class Auras {
 		VoxelModel zee = sprite(0.5f, palette('#', Paint.tintGlow(1f)), "#####", "...#.", "..#..", ".#...", "#####");
 		add("sleepy_zzz", "Sleepy Zs", CosmeticSlot.AURA, 0xFFBFD4FF, true, ctx -> motes(ctx, 3, 0.35, (pose, life, a, b, c, i) -> {
 			at(pose, -3 - life * 7 + Math.sin(life * 8) * 1, -10 - life * 12, -1);
-			pose.mulPose(Axis.ZP.rotationDegrees((float) Math.sin(life * 6 + i) * 15));
+			PoseUtil.mulPose(pose, Axis.ZP.rotationDegrees((float) Math.sin(life * 6 + i) * 15));
 			float s = (float) (0.5 + life * 0.8) * fade(life, 0.15);
 			pose.scale(s, s, s);
 			return zee;

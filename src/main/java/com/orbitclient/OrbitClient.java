@@ -30,6 +30,7 @@ public class OrbitClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		MixinAudit.runIfRequested();
 		// The client starts on the render thread; laid-out text is only reused there.
 		com.orbitclient.util.TextLayoutCache.init(Thread.currentThread());
 		// Minecraft starts Java headless, which leaves no clipboard for images. Turn that back off

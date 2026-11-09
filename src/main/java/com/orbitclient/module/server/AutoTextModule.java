@@ -30,7 +30,6 @@ public class AutoTextModule extends Module {
 	@Override
 	public void onTick() {
 		if (mc.player == null) return;
-		long window = mc.getWindow().handle();
 		for (int i = 0; i < SLOTS; i++) {
 			boolean down = mc.screen == null && keys[i].isBound() && keys[i].isDown();
 			if (down && !wasDown[i]) send(texts[i].get().trim());

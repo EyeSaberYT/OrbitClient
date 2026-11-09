@@ -1,5 +1,6 @@
 package com.orbitclient.cosmetics;
 
+import com.orbitclient.util.PoseUtil;
 import com.orbitclient.cosmetics.VoxelModel.Paint;
 import com.mojang.math.Axis;
 
@@ -162,7 +163,7 @@ final class Backs {
 				ctx.pose().popPose();
 			}
 			at(ctx.pose(), bx, by, bz);
-			ctx.pose().mulPose(Axis.ZP.rotationDegrees((float) Math.sin(t * 1.1) * -8f));
+			PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees((float) Math.sin(t * 1.1) * -8f));
 			ctx.draw(balloon);
 			ctx.pose().popPose();
 		});
@@ -209,7 +210,7 @@ final class Backs {
 			ctx.attach(ctx.model().body);
 			at(ctx.pose(), 3.2, 8.6, 3.8);
 			float swing = (float) (Math.sin(ctx.time() * 2.1) * 6 + Math.sin(s.walkAnimationPos * 0.6662) * 14 * Math.min(1, s.walkAnimationSpeed));
-			ctx.pose().mulPose(Axis.ZP.rotationDegrees(swing));
+			PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees(swing));
 			ctx.draw(lantern);
 			ctx.pose().popPose();
 		});
@@ -318,7 +319,7 @@ final class Backs {
 			// Turns in little steps, like it's being wound.
 			double turns = ctx.time() * 1.5;
 			double step = Math.floor(turns) + Math.min(1, (turns % 1) * 3);
-			ctx.pose().mulPose(Axis.ZP.rotationDegrees((float) (step * 45 % 360)));
+			PoseUtil.mulPose(ctx.pose(), Axis.ZP.rotationDegrees((float) (step * 45 % 360)));
 			ctx.draw(key);
 			ctx.pose().popPose();
 		});

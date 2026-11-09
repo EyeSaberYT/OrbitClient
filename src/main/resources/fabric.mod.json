@@ -14,8 +14,8 @@
 	"mixins": ["orbitclient.mixins.json"],
 	"depends": {
 		"fabricloader": ">=0.18.1",
-		"minecraft": "~1.21.11",
-		"java": ">=21",
+		"minecraft": "${minecraft}",
+		"java": ">=${java}",
 		"fabric-api": "*"
 	}
 }

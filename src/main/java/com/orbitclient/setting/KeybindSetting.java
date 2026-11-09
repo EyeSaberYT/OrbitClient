@@ -5,6 +5,7 @@ import com.google.gson.JsonPrimitive;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
+import com.orbitclient.util.InputUtil;
 
 /**
  * A key or mouse button. Keyboard keys are stored as their GLFW key code; mouse buttons are
@@ -37,9 +38,8 @@ public class KeybindSetting extends Setting<Integer> {
 	/** Whether the key or mouse button is held right now. */
 	public boolean isDown() {
 		if (!isBound()) return false;
-		long window = Minecraft.getInstance().getWindow().handle();
-		if (isMouse()) return GLFW.glfwGetMouseButton(window, mouseButton()) == GLFW.GLFW_PRESS;
-		return GLFW.glfwGetKey(window, value) == GLFW.GLFW_PRESS;
+		if (isMouse()) return InputUtil.isMouseDown(mouseButton());
+		return InputUtil.isKeyDown(value);
 	}
 
 	public String getKeyName() {

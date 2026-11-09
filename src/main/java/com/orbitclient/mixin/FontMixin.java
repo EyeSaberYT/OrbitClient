@@ -19,6 +19,7 @@ public abstract class FontMixin {
 		throw new AssertionError();
 	}
 
+	//? if >=1.21.11 {
 	@Inject(method = "prepareText(Lnet/minecraft/util/FormattedCharSequence;FFIZZI)Lnet/minecraft/client/gui/Font$PreparedText;",
 		at = @At("HEAD"), cancellable = true)
 	private void orbit$reuseLayout(FormattedCharSequence text, float x, float y, int color, boolean shadow, boolean includeEmpty,
@@ -34,4 +35,22 @@ public abstract class FontMixin {
 	                              int background, CallbackInfoReturnable<Font.PreparedText> cir) {
 		TextLayoutCache.store(text, cir.getReturnValue());
 	}
+	//?} else {
+	/*// Before 1.21.11 prepareText has no includeEmpty (it's always false there).
+	@Inject(method = "prepareText(Lnet/minecraft/util/FormattedCharSequence;FFIZI)Lnet/minecraft/client/gui/Font$PreparedText;",
+		at = @At("HEAD"), cancellable = true)
+	private void orbit$reuseLayout(FormattedCharSequence text, float x, float y, int color, boolean shadow, int background,
+	                               CallbackInfoReturnable<Font.PreparedText> cir) {
+		Font.PreparedText cached = TextLayoutCache.find((Font) (Object) this, getGlyphSource(FontDescription.DEFAULT), text,
+			x, y, color, shadow, false, background);
+		if (cached != null) cir.setReturnValue(cached);
+	}
+
+	@Inject(method = "prepareText(Lnet/minecraft/util/FormattedCharSequence;FFIZI)Lnet/minecraft/client/gui/Font$PreparedText;",
+		at = @At("RETURN"))
+	private void orbit$keepLayout(FormattedCharSequence text, float x, float y, int color, boolean shadow, int background,
+	                              CallbackInfoReturnable<Font.PreparedText> cir) {
+		TextLayoutCache.store(text, cir.getReturnValue());
+	}
+	*///?}
 }

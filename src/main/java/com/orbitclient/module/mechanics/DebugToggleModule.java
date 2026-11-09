@@ -52,8 +52,9 @@ public class DebugToggleModule extends Module {
 		}
 		boolean hidden = mc.player != null && mc.showOnlyReducedInfo();
 		if (hidden && !toldHidden) {
-			mc.player.displayClientMessage(Component.literal(what + " are hidden: Reduced Debug Info is on (your Chat Settings, or this server's rules).")
-				.withStyle(ChatFormatting.GRAY), true);
+			Component message = Component.literal(what + " are hidden: Reduced Debug Info is on (your Chat Settings, or this server's rules).")
+				.withStyle(ChatFormatting.GRAY);
+			mc.player.displayClientMessage(message, true);
 		}
 		toldHidden = hidden;
 	}

@@ -9,7 +9,7 @@ import com.orbitclient.util.Anim;
 import net.minecraft.client.CameraType;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.Items;
-import org.lwjgl.glfw.GLFW;
+import com.orbitclient.util.InputUtil;
 
 /**
  * Look around your player in third person without changing where you're facing.
@@ -35,7 +35,7 @@ public class FreelookModule extends Module {
 		super("Freelook", "Hold the key to look around without turning your player.", Category.MECHANIC);
 		setIcon(Items.ENDER_EYE);
 		instance = this;
-		key = add(new KeybindSetting("Freelook Key", GLFW.GLFW_KEY_LEFT_ALT));
+		key = add(new KeybindSetting("Freelook Key", InputUtil.KEY_LEFT_ALT));
 		mode = add(new ModeSetting("Mode", "Hold", "Hold", "Toggle"));
 		invertPitch = add(new BooleanSetting("Invert Pitch", false));
 		smoothReturn = add(new BooleanSetting("Smooth Return", true));

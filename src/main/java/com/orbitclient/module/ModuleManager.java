@@ -129,7 +129,6 @@ public final class ModuleManager {
 	}
 
 	public static void tick(Minecraft mc) {
-		long window = mc.getWindow().handle();
 		for (Module module : MODULES) {
 			if (module.toggleKey.isBound()) {
 				boolean down = mc.screen == null && module.toggleKey.isDown();
