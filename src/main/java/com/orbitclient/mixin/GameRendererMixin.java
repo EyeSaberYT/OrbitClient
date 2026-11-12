@@ -6,6 +6,7 @@ import com.orbitclient.module.visual.MotionBlurModule;
 import com.orbitclient.module.visual.NoHurtCamModule;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.sugar.Local;
+//? if >=1.21.6
 import com.mojang.blaze3d.resource.CrossFrameResourcePool;
 import net.minecraft.client.renderer.GameRenderer;
 import org.spongepowered.asm.mixin.Final;
@@ -18,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GameRenderer.class)
 public class GameRendererMixin {
 	// From 26.1 the camera works out the field of view: see CameraMixin.
-	//? if <26.1 {
+	//? if >=1.21.2 <26.1 {
 	/** useFovSetting is false for the held-item pass, which shouldn't zoom. */
 	@ModifyReturnValue(method = "getFov", at = @At("RETURN"))
 	private float orbit$zoom(float fov, @Local(argsOnly = true) boolean useFovSetting) {
@@ -28,6 +29,16 @@ public class GameRendererMixin {
 		return result;
 	}
 	//?}
+	//? if <1.21.2 {
+	/*/^* useFovSetting is false for the held-item pass, which shouldn't zoom. Before 1.21.2 the angle was a double. ^/
+	@ModifyReturnValue(method = "getFov", at = @At("RETURN"))
+	private double orbit$zoom(double fov, @Local(argsOnly = true) boolean useFovSetting) {
+		if (!useFovSetting) return fov;
+		float result = ZoomModule.modifyFov((float) fov);
+		WaypointsModule.setFov(result);
+		return result;
+	}
+	*///?}
 
 	/** No hand or held item in the way while zoomed in. */
 	@Inject(method = "renderItemInHand", at = @At("HEAD"), cancellable = true)
@@ -40,6 +51,7 @@ public class GameRendererMixin {
 		if (NoHurtCamModule.active()) ci.cancel();
 	}
 
+	//? if >=1.21.6 {
 	@Shadow
 	@Final
 	private CrossFrameResourcePool resourcePool;
@@ -49,4 +61,5 @@ public class GameRendererMixin {
 	private void orbit$motionBlur(CallbackInfo ci) {
 		MotionBlurModule.apply(resourcePool);
 	}
+	//?}
 }

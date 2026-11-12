@@ -4,6 +4,7 @@ import com.orbitclient.OrbitClient;
 import com.orbitclient.config.ClientSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+//? if >=1.21.9
 import net.minecraft.network.chat.FontDescription;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
@@ -18,7 +19,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * so it shows wherever the name is drawn. Who uses Orbit Client comes from the cosmetics server.
  */
 public final class OrbitBadge {
+	//? if >=1.21.9 {
 	private static final FontDescription FONT = new FontDescription.Resource(Identifier.fromNamespaceAndPath(OrbitClient.MOD_ID, "badge"));
+	//?} else
+	/*private static final Identifier FONT = Identifier.fromNamespaceAndPath(OrbitClient.MOD_ID, "badge");*/
 	private static final Component BADGE = Component.literal("✦").withStyle(s -> s.withColor(0x8C7BFF));
 	/** Friends get a green badge (friends always use Orbit Client: they're on its friends server). */
 	private static final Component FRIEND_BADGE = Component.literal("✦").withStyle(s -> s.withColor(0x3FD07A));

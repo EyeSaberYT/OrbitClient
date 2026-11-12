@@ -12,6 +12,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+//? if >=1.20.5
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -101,7 +102,7 @@ public class SaturationModule extends Module {
 
 		FoodProperties held = heldFood(player);
 		if (held != null && instance.foodPreview.isOn()) {
-			int newLevel = Math.min(20, level + held.nutrition());
+			int newLevel = Math.min(20, level + nutrition(held));
 			for (int i = 0; i < 10; i++) {
 				int points = Math.max(0, Math.min(2, newLevel - i * 2)), current = Math.max(0, Math.min(2, level - i * 2));
 				if (points <= current) continue;
@@ -114,8 +115,8 @@ public class SaturationModule extends Module {
 			int color = instance.saturationColor.getColor() | 0xFF000000;
 			outlines(g, right, y, 0, sat, Render2D.withAlpha(color, 0.95f));
 			if (held != null && instance.foodPreview.isOn()) {
-				int newLevel = Math.min(20, level + held.nutrition());
-				float newSat = Math.min(newLevel, sat + held.saturation());
+				int newLevel = Math.min(20, level + nutrition(held));
+				float newSat = Math.min(newLevel, sat + saturation(held));
 				outlines(g, right, y, sat, newSat, Render2D.withAlpha(color, pulse));
 			}
 		}
@@ -136,7 +137,7 @@ public class SaturationModule extends Module {
 
 	private static FoodProperties heldFood(Player player) {
 		for (ItemStack stack : List.of(player.getMainHandItem(), player.getOffhandItem())) {
-			FoodProperties food = stack.get(DataComponents.FOOD);
+			FoodProperties food = food(stack);
 			if (food != null) return food;
 		}
 		return null;
@@ -147,12 +148,15 @@ public class SaturationModule extends Module {
 		if (outlineReady) return;
 		outlineReady = true;
 		Minecraft mc = Minecraft.getInstance();
+		//? if >=1.20.2 {
 		var res = mc.getResourceManager().getResource(Identifier.withDefaultNamespace("textures/gui/sprites/hud/food_empty.png"));
+		//?} else
+		/*var res = mc.getResourceManager().getResource(Identifier.withDefaultNamespace("textures/gui/icons.png"));*/
 		if (res.isEmpty()) {
 			outlineReady = false;
 			return;
 		}
-		try (InputStream in = res.get().open(); NativeImage src = NativeImage.read(in)) {
+		try (InputStream in = res.get().open(); NativeImage src = drumstick(NativeImage.read(in))) {
 			int w = src.getWidth(), h = src.getHeight();
 			NativeImage out = new NativeImage(w, h, true);
 			for (int y = 0; y < h; y++) {
@@ -168,18 +172,54 @@ public class SaturationModule extends Module {
 		}
 	}
 
+	/** The empty drumstick (before 1.20.2 the 9x9 piece at (16, 27) of the HUD icons, which are closed here). */
+	private static NativeImage drumstick(NativeImage image) {
+		//? if >=1.20.2 {
+		return image;
+		//?} else {
+		/*try (image) {
+			NativeImage piece = new NativeImage(9, 9, true);
+			image.copyRect(piece, 16, 27, 0, 0, 9, 9, false, false);
+			return piece;
+		}
+		*///?}
+	}
+
 	private static int alpha(NativeImage img, int x, int y) {
 		if (x < 0 || y < 0 || x >= img.getWidth() || y >= img.getHeight()) return 0;
 		return (img.getPixel(x, y) >>> 24) & 0xFF;
 	}
 
+	/** The food an item gives, or null. */
+	private static FoodProperties food(ItemStack stack) {
+		//? if >=1.20.5 {
+		return stack.get(DataComponents.FOOD);
+		//?} else
+		/*return stack.getItem().getFoodProperties();*/
+	}
+
+	private static int nutrition(FoodProperties food) {
+		//? if >=1.20.5 {
+		return food.nutrition();
+		//?} else
+		/*return food.getNutrition();*/
+	}
+
+	/** The saturation points it gives (before 1.20.5 kept as a modifier: nutrition times modifier times 2). */
+	private static float saturation(FoodProperties food) {
+		//? if >=1.20.5 {
+		return food.saturation();
+		//?} else
+		/*return food.getNutrition() * food.getSaturationModifier() * 2f;*/
+	}
+
 	/** Adds "Hunger +4  Saturation +2.4" under the name of food items. */
 	public static void tooltip(ItemStack stack, List<Component> lines) {
 		if (!on() || !instance.tooltips.isOn()) return;
-		FoodProperties food = stack.get(DataComponents.FOOD);
+		FoodProperties food = food(stack);
 		if (food == null) return;
-		Component line = Component.literal("Hunger +" + food.nutrition()).withStyle(ChatFormatting.GRAY)
-			.append(Component.literal("  Saturation +" + String.format("%.1f", food.saturation())).withStyle(ChatFormatting.GOLD));
+		Component line = Component.literal("Hunger +" + nutrition(food)).withStyle(ChatFormatting.GRAY)
+			.append(Component.literal("  Saturation +" + String.format("%.1f", saturation(food))).withStyle(ChatFormatting.GOLD));
 		lines.add(Math.min(1, lines.size()), line);
 	}
 }

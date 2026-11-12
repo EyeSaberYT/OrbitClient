@@ -1,6 +1,6 @@
 package com.orbitclient.account;
 
-//? if <26.2 {
+//? if >=1.20.3 <26.2 {
 import com.mojang.authlib.minecraft.UserApiService;
 import com.mojang.authlib.yggdrasil.ProfileResult;
 import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
@@ -44,7 +44,7 @@ public final class SessionSwap {
 			UserApiService userApi;
 			try {
 				userApi = auth.createUserApiService(accessToken);
-			} catch (RuntimeException e) {
+			} catch (Exception e) {
 				// Same as the game at startup: without it the account still plays, with chat reporting and social off.
 				userApi = UserApiService.OFFLINE;
 			}
@@ -63,7 +63,12 @@ public final class SessionSwap {
 
 			mc.execute(() -> {
 				MinecraftAccountAccessor game = (MinecraftAccountAccessor) mc;
+				//? if >=1.21.9 {
 				game.orbit$setServices(services);
+				//?} else {
+				/*game.orbit$setAuthenticationService(auth);
+				game.orbit$setSessionService(services.sessionService());
+				*///?}
 				game.orbit$setUser(user);
 				game.orbit$setProfileFuture(CompletableFuture.completedFuture(profile));
 				game.orbit$setUserApiService(finalUserApi);

@@ -16,6 +16,26 @@ public class OrbitMixinPlugin implements IMixinConfigPlugin {
 		//? if >=26.1 {
 		/*mixins.add("ClientClockMixin");
 		*///?}
+		//? if >=26.2 {
+		/*mixins.add("GuiScreenMixin");
+		*///?}
+		//? if >=1.21.6
+		mixins.add("PostChainAccessor");
+		//? if >=1.20.5 <1.21.6 {
+		/*mixins.add("GuiHudMixin");
+		*///?}
+		//? if <1.20.5 {
+		/*mixins.add("GuiHudLegacyMixin");
+		*///?}
+		//? if <1.21.6 {
+		/*mixins.add("BossHealthOverlayMixin");
+		*///?}
+		//? if <1.20.2 {
+		/*mixins.add("ScreenBackgroundMixin");
+		*///?}
+		//? if >=1.21.5 <1.21.6 {
+		/*mixins.add("ItemEntityRendererAccessor");
+		*///?}
 		return mixins;
 	}
 
@@ -30,8 +50,16 @@ public class OrbitMixinPlugin implements IMixinConfigPlugin {
 
 	@Override
 	public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-		//? if >=26.2 {
-		/*// Only SessionSwap uses it, and that's not in 26.2 and newer.
+		//? if <1.21.6 {
+		/*// Before 1.21.6 text isn't laid out with Font.prepareText, so there's nothing for the text cache to reuse.
+		if (mixinClassName.endsWith(".FontMixin")) return false;
+		*///?}
+		//? if <1.20.5 {
+		/*// Menu Blur uses vanilla's menu blur, which is new in 1.20.5.
+		if (mixinClassName.endsWith(".AbstractContainerScreenMixin")) return false;
+		*///?}
+		//? if >=26.2 || <1.20.3 {
+		/*// Only SessionSwap uses it, which is only in 1.20.3 to 26.1.
 		if (mixinClassName.endsWith(".MinecraftAccountAccessor")) return false;
 		*///?}
 		return true;

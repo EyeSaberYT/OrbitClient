@@ -70,6 +70,15 @@ public final class OrbitHomeScreen extends TitleScreen {
 	private final List<Hit> popupHits = new ArrayList<>();
 	private int chipX, chipY, chipW, chipH, popupX, popupY, popupW, popupH;
 
+	/**
+	 * The screen to open in place of {@code screen}: this one for the vanilla title screen, and for closing a
+	 * screen outside a world (null, which opens a TitleScreen further on). Every other screen is left alone.
+	 */
+	public static Screen replacing(Screen screen, net.minecraft.client.Minecraft minecraft) {
+		if (screen == null && minecraft.level == null) return new OrbitHomeScreen();
+		return screen instanceof TitleScreen && !(screen instanceof OrbitHomeScreen) ? new OrbitHomeScreen() : screen;
+	}
+
 	public OrbitHomeScreen() {
 		super();
 		Random random = new Random(7);

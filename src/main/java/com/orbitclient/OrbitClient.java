@@ -22,8 +22,11 @@ public class OrbitClient implements ClientModInitializer {
 	public static final String MOD_ID = "orbitclient";
 	public static final Logger LOGGER = LoggerFactory.getLogger("Orbit Client");
 
+	//? if >=1.21.9 {
 	private static final KeyMapping.Category CATEGORY =
 		KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main"));
+	//?} else
+	/*private static final String CATEGORY = "key.category.orbitclient.main";*/
 
 	public static KeyMapping menuKey;
 	public static KeyMapping zoomKey;
@@ -51,9 +54,15 @@ public class OrbitClient implements ClientModInitializer {
 		HudRenderer.register();
 		// Cosmetics on every player model (the cape is handled by the cape layer).
 		net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback.EVENT.register((type, renderer, helper, context) -> {
+			//? if >=1.21.9 {
 			if (renderer instanceof net.minecraft.client.renderer.entity.player.AvatarRenderer<?> avatar) {
+			//?} else
+			/*if (renderer instanceof net.minecraft.client.renderer.entity.player.PlayerRenderer avatar) {*/
 				@SuppressWarnings("unchecked")
+				//? if >=1.21.2 {
 				var parent = (net.minecraft.client.renderer.entity.RenderLayerParent<net.minecraft.client.renderer.entity.state.AvatarRenderState, net.minecraft.client.model.player.PlayerModel>) (Object) avatar;
+				//?} else
+				/*var parent = (net.minecraft.client.renderer.entity.RenderLayerParent<net.minecraft.client.player.AbstractClientPlayer, net.minecraft.client.model.player.PlayerModel<net.minecraft.client.player.AbstractClientPlayer>>) (Object) avatar;*/
 				helper.register(new com.orbitclient.cosmetics.CosmeticsLayer(parent));
 			}
 		});

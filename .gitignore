@@ -59,3 +59,6 @@ gametest.log
 
 # Python tools
 __pycache__/
+
+# Large local archive, not part of the mod.
+EclipseClient.zip

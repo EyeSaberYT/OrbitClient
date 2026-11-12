@@ -84,10 +84,17 @@ public final class WaypointManager {
 	private static String currentSpawn() {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.level == null) return null;
+		//? if >=1.21.9 {
 		LevelData.RespawnData spawn = mc.level.getLevelData().getRespawnData();
 		if (spawn == null || spawn.equals(LevelData.RespawnData.DEFAULT)) return null;
 		BlockPos pos = spawn.pos();
 		return spawn.dimension().identifier() + " " + pos.getX() + " " + pos.getY() + " " + pos.getZ();
+		//?} else {
+		/*// Before 1.21.9 the world spawn is always in the overworld, and unset is the origin.
+		BlockPos pos = mc.level.getLevelData().getSpawnPos();
+		if (pos.equals(BlockPos.ZERO)) return null;
+		return "minecraft:overworld " + pos.getX() + " " + pos.getY() + " " + pos.getZ();
+		*///?}
 	}
 
 	private static boolean autoDetect() {

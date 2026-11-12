@@ -7,11 +7,12 @@ def mc = stonecutter.current.version
 def unobfuscated = stonecutter.current.parsed.matches('>=26.1')
 def fabricApiByVersion = [
 	'1.16.5': '0.42.0+1.16', '1.17.1': '0.46.1+1.17',
-	'1.18.2': '0.77.0+1.18.2', '1.19.2': '0.77.0+1.19.2', '1.19.3': '0.76.1+1.19.3',
+	'1.18.1': '0.46.6+1.18', '1.18.2': '0.77.0+1.18.2', '1.19': '0.58.0+1.19', '1.19.1': '0.58.5+1.19.1',
+	'1.19.2': '0.77.0+1.19.2', '1.19.3': '0.76.1+1.19.3',
 	'1.19.4': '0.87.2+1.19.4', '1.20': '0.83.0+1.20', '1.20.1': '0.92.12+1.20.1',
 	'1.20.2': '0.91.6+1.20.2', '1.20.3': '0.91.1+1.20.3', '1.20.4': '0.97.3+1.20.4',
 	'1.20.5': '0.97.8+1.20.5', '1.20.6': '0.100.8+1.20.6', '1.21': '0.102.0+1.21',
-	'1.21.1': '0.116.17+1.21.1', '1.21.3': '0.114.1+1.21.3', '1.21.4': '0.119.4+1.21.4',
+	'1.21.1': '0.116.17+1.21.1', '1.21.2': '0.106.1+1.21.2', '1.21.3': '0.114.1+1.21.3', '1.21.4': '0.119.4+1.21.4',
 	'1.21.5': '0.128.2+1.21.5', '1.21.6': '0.128.2+1.21.6', '1.21.7': '0.129.0+1.21.7',
 	'1.21.8': '0.136.1+1.21.8', '1.21.9': '0.134.1+1.21.9', '1.21.10': '0.138.4+1.21.10',
 	'1.21.11': '0.141.6+1.21.11', '26.1': '0.145.1+26.1', '26.1.1': '0.145.4+26.1.1',
@@ -75,6 +76,8 @@ tasks.register('exportCosmetics', JavaExec) {
 }
 
 // Names that changed between versions, rewritten in the sources for the version being built.
+// All rules run in one pass over the shared (1.21.11) sources: each must match that text and give the final
+// text (one rule's result isn't seen by another), and where two match at the same place the later one wins.
 	stonecutter {
 	// Mojang renamed these in 1.21.11 (ResourceLocation became Identifier, and so on).
 	replacements.string(stonecutter.current.parsed.matches('<1.21.11')) {
@@ -104,8 +107,9 @@ tasks.register('exportCosmetics', JavaExec) {
 			.collect { [it[0].replace('.', '/'), it[1].replace('.', '/')] }
 		replacements.regex(when) {
 			(renames + slashed).each { pair ->
-				// Each reverse needs its own pattern and a non-empty value; neither is ever used.
-				replace java.util.regex.Pattern.quote(pair[0]), java.util.regex.Matcher.quoteReplacement(pair[1]), "(?!)reverse${reverses++}", 'unused'
+				// Each reverse needs its own pattern and a non-empty value; neither is ever used. The value is
+				// inserted as it is (not as a regex replacement), so it isn't escaped.
+				replace java.util.regex.Pattern.quote(pair[0]), pair[1].toString(), "(?!)reverse${reverses++}", 'unused'
 			}
 		}
 	}
@@ -198,8 +202,7 @@ tasks.register('exportCosmetics', JavaExec) {
 		['method = "renderFire"', 'method = "submitFire"'],
 		['method = "renderHitOutline"', 'method = "submitHitOutline"'],
 		['mc.getToastManager()', 'mc.gui.toastManager()'],
-		// Opening a screen: 26.2 kept only setScreenAndShow (the home screen hook in MinecraftMixin).
-		['@ModifyVariable(method = "setScreen"', '@ModifyVariable(method = "setScreenAndShow"'],
+		['mc.getOverlay()', 'mc.gui.overlay()'],
 	])
 	// 26.3 moved the render API to com.mojang.renderpearl and renamed key input.
 	oneWay(v.matches('>=26.3'), [
@@ -216,6 +219,211 @@ tasks.register('exportCosmetics', JavaExec) {
 	oneWay(v.matches('<=1.21.10'), [
 		['import net.minecraft.client.renderer.rendertype.RenderTypes;', '// RenderTypes is new in 1.21.11'],
 		['RenderTypes.entityCutoutNoCull(', 'RenderType.entityCutoutNoCull('],
+	])
+	// Before 1.21.9: no input events, no submit-based model drawing, authlib 6 (getters, not records).
+	// The new classes Orbit uses are stood in for by com.orbitclient.compat; the screens' input methods
+	// take the old arguments and make the event themselves.
+	def oldInput = { String event, String make ->
+		"${event} event = new ${event}(${make});"
+	}
+	oneWay(v.matches('<1.21.9'), [
+		['import net.minecraft.client.input.MouseButtonEvent;', 'import com.orbitclient.compat.MouseButtonEvent;'],
+		['import net.minecraft.client.input.KeyEvent;', 'import com.orbitclient.compat.KeyEvent;'],
+		['import net.minecraft.client.input.CharacterEvent;', 'import com.orbitclient.compat.CharacterEvent;'],
+		['import net.minecraft.client.renderer.SubmitNodeCollector;', 'import com.orbitclient.compat.SubmitNodeCollector;'],
+		['public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {',
+			'public boolean mouseClicked(double orbitX, double orbitY, int orbitButton) {\n\t\t' + oldInput('MouseButtonEvent', 'orbitX, orbitY, orbitButton') + '\n\t\tboolean doubleClick = false;'],
+		['public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {',
+			'public boolean mouseDragged(double orbitX, double orbitY, int orbitButton, double dx, double dy) {\n\t\t' + oldInput('MouseButtonEvent', 'orbitX, orbitY, orbitButton')],
+		['public boolean mouseReleased(MouseButtonEvent event) {',
+			'public boolean mouseReleased(double orbitX, double orbitY, int orbitButton) {\n\t\t' + oldInput('MouseButtonEvent', 'orbitX, orbitY, orbitButton')],
+		['public boolean keyPressed(KeyEvent event) {',
+			'public boolean keyPressed(int orbitKey, int orbitScancode, int orbitModifiers) {\n\t\t' + oldInput('KeyEvent', 'orbitKey, orbitScancode, orbitModifiers')],
+		['public boolean keyReleased(KeyEvent event) {',
+			'public boolean keyReleased(int orbitKey, int orbitScancode, int orbitModifiers) {\n\t\t' + oldInput('KeyEvent', 'orbitKey, orbitScancode, orbitModifiers')],
+		['public boolean charTyped(CharacterEvent event) {',
+			'public boolean charTyped(char orbitChar, int orbitModifiers) {\n\t\t' + oldInput('CharacterEvent', 'orbitChar, orbitModifiers')],
+		['private void orbit$copyMessage(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {',
+			'private void orbit$copyMessage(double orbitX, double orbitY, int orbitButton, CallbackInfoReturnable<Boolean> cir) {\n\t\t' + oldInput('MouseButtonEvent', 'orbitX, orbitY, orbitButton')],
+		['super.mouseClicked(event, doubleClick)', 'super.mouseClicked(event.x(), event.y(), event.button())'],
+		['super.mouseDragged(event, dx, dy)', 'super.mouseDragged(event.x(), event.y(), event.button(), dx, dy)'],
+		['super.mouseReleased(event)', 'super.mouseReleased(event.x(), event.y(), event.button())'],
+		['super.keyPressed(event)', 'super.keyPressed(event.key(), event.scancode(), event.modifiers())'],
+		['super.keyReleased(event)', 'super.keyReleased(event.key(), event.scancode(), event.modifiers())'],
+		['super.charTyped(event)', 'super.charTyped((char) event.codepoint(), event.modifiers())'],
+		// Player models: AvatarRenderState was PlayerRenderState, and skins lived with the client resources.
+		['net.minecraft.client.renderer.entity.state.AvatarRenderState', 'net.minecraft.client.renderer.entity.state.PlayerRenderState'],
+		['AvatarRenderState', 'PlayerRenderState'],
+		['net.minecraft.world.entity.player.PlayerSkin', 'net.minecraft.client.resources.PlayerSkin'],
+		['state.skin.cape() != null ? state.skin.cape().texturePath()', 'state.skin.capeTexture() != null ? state.skin.capeTexture()'],
+		['mc.getSkinManager().createLookup(mc.getGameProfile(), false)', 'mc.getSkinManager().lookupInsecure(mc.getGameProfile())'],
+		['mc.getSkinManager().createLookup(new GameProfile(uuid, name.isEmpty() ? "Player" : name), false)', 'mc.getSkinManager().lookupInsecure(new GameProfile(uuid, name.isEmpty() ? "Player" : name))'],
+		['mc.getSkinManager().createLookup(result.profile(), false)', 'mc.getSkinManager().lookupInsecure(result.profile())'],
+		// authlib 6 and the session service.
+		['mc.services().sessionService()', 'mc.getMinecraftSessionService()'],
+		['getGameProfile().id()', 'getGameProfile().getId()'],
+		['getGameProfile().name()', 'getGameProfile().getName()'],
+		['getProfile().id()', 'getProfile().getId()'],
+		['getProfile().name()', 'getProfile().getName()'],
+		['new User(name, uuid, accessToken, Optional.empty(), Optional.empty())', 'new User(name, uuid, accessToken, Optional.empty(), Optional.empty(), User.Type.MSA)'],
+		['getWindow().handle()', 'getWindow().getWindow()'],
+	])
+	// Before 1.21.6: GuiGraphics.pose() was a 3D PoseStack, and there was no Fabric HUD element API or GUI strata
+	// (com.orbitclient.compat stands in for them).
+	oneWay(v.matches('<1.21.6'), [
+		['g.pose()', 'com.orbitclient.compat.GuiPose.of(g)'],
+		['graphics.pose()', 'com.orbitclient.compat.GuiPose.of(graphics)'],
+		['import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;', 'import com.orbitclient.compat.HudElement;'],
+		['import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;', 'import com.orbitclient.compat.HudElementRegistry;'],
+		['import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;', 'import com.orbitclient.compat.VanillaHudElements;'],
+		['g.nextStratum();', '{ } // GUI strata are new in 1.21.6'],
+		// Textured GUI draws took a RenderType factory instead of a pipeline.
+		['RenderPipelines.GUI_TEXTURED', 'net.minecraft.client.renderer.RenderType::guiTextured'],
+		// The GUI scale was a double.
+		['Math.max(1, mc.getWindow().getGuiScale())', 'Math.max(1, (int) mc.getWindow().getGuiScale())'],
+		['Math.max(1, minecraft.getWindow().getGuiScale())', 'Math.max(1, (int) minecraft.getWindow().getGuiScale())'],
+		['Math.max(1, Minecraft.getInstance().getWindow().getGuiScale())', 'Math.max(1, (int) Minecraft.getInstance().getWindow().getGuiScale())'],
+		['SharedConstants.getCurrentVersion().name()', 'SharedConstants.getCurrentVersion().getName()'],
+		['camera.position()', 'camera.getPosition()'],
+		['Gui.getMobEffectSprite(e.effect)', 'net.minecraft.client.Minecraft.getInstance().getMobEffectTextures().get(e.effect)'],
+		// No Font.PreparedText: FontMixin isn't applied (OrbitMixinPlugin), the text cache just compiles.
+		['Font.PreparedText', 'Object'],
+	])
+	// Before 1.21.5: no render pipelines or texture samplers, unlabelled textures, ClickEvent/HoverEvent
+	// with an action instead of a record per action, and the older effect and inventory names.
+	oneWay(v.matches('<1.21.5'), [
+		['import net.minecraft.client.renderer.RenderPipelines;', '// RenderPipelines is new in 1.21.5'],
+		['import com.mojang.blaze3d.textures.AddressMode;', '// AddressMode is new in 1.21.5'],
+		['import com.mojang.blaze3d.textures.FilterMode;', '// FilterMode is new in 1.21.5'],
+		['new DynamicTexture(() -> "Orbit saturation outline", out)', 'new DynamicTexture(out)'],
+		['super(() -> "Orbit glint", image);', 'super(image);'],
+		['super(() -> "orbit " + name, image);', 'super(image);'],
+		['MobEffects.SPEED', 'MobEffects.MOVEMENT_SPEED'],
+		['MobEffects.STRENGTH', 'MobEffects.DAMAGE_BOOST'],
+		['new ClickEvent.OpenFile(newest)', 'new ClickEvent(ClickEvent.Action.OPEN_FILE, newest.getAbsolutePath())'],
+		['new ClickEvent.OpenFile(dir)', 'new ClickEvent(ClickEvent.Action.OPEN_FILE, dir.getAbsolutePath())'],
+		['new ClickEvent.RunCommand(', 'new ClickEvent(ClickEvent.Action.RUN_COMMAND, '],
+		['new ClickEvent.CopyToClipboard(', 'new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, '],
+		['new HoverEvent.ShowText(', 'new HoverEvent(HoverEvent.Action.SHOW_TEXT, '],
+		['getInventory().getSelectedSlot()', 'getInventory().selected'],
+	])
+	// 1.21.2 and 1.21.3: equipment layers came from EquipmentModel, and the chest slot was chestItem.
+	oneWay(v.matches('<1.21.4'), [
+		['import net.minecraft.client.resources.model.EquipmentClientInfo;', 'import net.minecraft.world.item.equipment.EquipmentModel;'],
+		['EquipmentClientInfo.LayerType', 'EquipmentModel.LayerType'],
+		['state.chestEquipment', 'state.chestItem'],
+	])
+	// Before 1.21.2: no entity render states (com.orbitclient.compat.PlayerRenderState is filled from the player),
+	// GUI textures without a color, ARGB-swapped NativeImage pixels, and no model root.
+	oneWay(v.matches('<1.21.2'), [
+		['net.minecraft.client.renderer.entity.state.AvatarRenderState', 'com.orbitclient.compat.PlayerRenderState'],
+		['net.minecraft.client.renderer.entity.state.PlayerRenderState', 'com.orbitclient.compat.PlayerRenderState'],
+		['import net.minecraft.client.resources.model.EquipmentClientInfo;', '// Equipment layers are new in 1.21.2'],
+		['import net.minecraft.world.item.equipment.EquipmentModel;', '// Equipment layers are new in 1.21.2'],
+		['EquipmentClientInfo.LayerType.WINGS', 'true'],
+		['EquipmentClientInfo.LayerType.HUMANOID', 'false'],
+		['EquipmentModel.LayerType.WINGS', 'true'],
+		['EquipmentModel.LayerType.HUMANOID', 'false'],
+		['g.blit(RenderPipelines.GUI_TEXTURED, ', 'com.orbitclient.compat.GuiBlit.blit(g, '],
+		['g.blit(net.minecraft.client.renderer.RenderType::guiTextured, ', 'com.orbitclient.compat.GuiBlit.blit(g, '],
+		['g.blitSprite(RenderPipelines.GUI_TEXTURED, ', 'com.orbitclient.compat.GuiBlit.blitSprite(g, '],
+		['g.blitSprite(net.minecraft.client.renderer.RenderType::guiTextured, ', 'com.orbitclient.compat.GuiBlit.blitSprite(g, '],
+		['PlayerFaceRenderer.draw(g, ', 'com.orbitclient.compat.GuiBlit.face(g, '],
+		['img.setPixel(', 'com.orbitclient.compat.Pixels.set(img, '],
+		['out.setPixel(', 'com.orbitclient.compat.Pixels.set(out, '],
+		['image.setPixel(', 'com.orbitclient.compat.Pixels.set(image, '],
+		['pixels.setPixel(', 'com.orbitclient.compat.Pixels.set(pixels, '],
+		['img.getPixel(', 'com.orbitclient.compat.Pixels.get(img, '],
+		['image.getPixel(', 'com.orbitclient.compat.Pixels.get(image, '],
+		['new DustParticleOptions(color, ', 'new DustParticleOptions(com.orbitclient.compat.Pixels.rgb(color), '],
+		['getCooldownPercent(stack, 0f)', 'getCooldownPercent(stack.getItem(), 0f)'],
+		['mc.getToastManager()', 'mc.getToasts()'],
+		['getDeltaTracker()', 'getTimer()'],
+		['ctx.model().root().translateAndRotate(ctx.pose());', '// No model root before 1.21.2'],
+		['model.root().translateAndRotate(pose);', '// No model root before 1.21.2'],
+		['getParentModel().root().translateAndRotate(pose);', '// No model root before 1.21.2'],
+	])
+	// Before 1.21: a plain partial tick instead of DeltaTracker,
+	// ResourceLocation constructors instead of factories, and the options screen one package up.
+	oneWay(v.matches('<1.21'), [
+		['import net.minecraft.client.DeltaTracker;', 'import com.orbitclient.compat.DeltaTracker;'],
+		['mc.getDeltaTracker()', 'com.orbitclient.compat.DeltaTracker.of(mc)'],
+		['Minecraft.getInstance().getDeltaTracker()', 'com.orbitclient.compat.DeltaTracker.of(Minecraft.getInstance())'],
+		['GuiGraphics graphics, DeltaTracker delta, Operation<Void> original', 'GuiGraphics graphics, float delta, Operation<Void> original'],
+		['graphics, delta, (g, d) -> original.call(g, d))', 'graphics, DeltaTracker.of(delta), (g, d) -> original.call(g, d.getGameTimeDeltaPartialTick(false)))'],
+		['Identifier.fromNamespaceAndPath(', 'new ResourceLocation('],
+		['Identifier.withDefaultNamespace(', 'new ResourceLocation('],
+		['import net.minecraft.client.gui.screens.options.OptionsScreen;', 'import net.minecraft.client.gui.screens.OptionsScreen;'],
+	])
+	// Before 1.20.5: Java 17 (no List.getFirst/removeFirst), effects as MobEffect instead of a Holder, no tooltip
+	// context, no panorama on every screen, and the older connect, message and inventory-entity calls.
+	oneWay(v.matches('<1.20.5'), [
+		['list.isEmpty() ? null : list.getFirst()', 'list.isEmpty() ? null : list.get(0)'],
+		['worldsOf(server).getFirst()', 'worldsOf(server).get(0)'],
+		['worldsOf(world.server).getFirst()', 'worldsOf(world.server).get(0)'],
+		['changes.removeFirst()', 'changes.remove(0)'],
+		['chat.orbit$allMessages().removeFirst()', 'chat.orbit$allMessages().remove(0)'],
+		['chat.removeFirst()', 'chat.remove(0)'],
+		['Holder<MobEffect>', 'MobEffect'],
+		['effect.getEffect().getRegisteredName()', 'net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.getKey(effect.getEffect()).toString()'],
+		['effect.getEffect().value()', 'effect.getEffect()'],
+		['(stack, context, flag, lines) ->', '(stack, flag, lines) ->'],
+		['track("Wind Charges", false, Items.WIND_CHARGE);', '// Wind charges are new in 1.20.5'],
+		['renderPanorama(g, delta);', 'com.orbitclient.compat.Panorama.render(g, delta);'],
+		['minecraft.disconnect(new net.minecraft.client.gui.screens.GenericMessageScreen(Component.literal("Joining " + f.name())), false);',
+			'minecraft.disconnect(new net.minecraft.client.gui.screens.GenericDirtMessageScreen(Component.literal("Joining " + f.name())));'],
+		['ServerData.Type.OTHER), false, null);', 'ServerData.Type.OTHER), false);'],
+		['mc.level.getLevelData().getSpawnPos()', 'new BlockPos(mc.level.getLevelData().getXSpawn(), mc.level.getLevelData().getYSpawn(), mc.level.getLevelData().getZSpawn())'],
+		['(y1 + y2) / 2f, scale,', '(y1 + y2) / 2f, Math.round(scale),'],
+		['@Invoker("refreshTrimmedMessages")', '@Invoker("refreshTrimmedMessage")'],
+	])
+	// Before 1.20.3: authlib 5, and system toasts had a fixed set of ids.
+	oneWay(v.matches('<1.20.3'), [
+		['userApi.fetchProperties()', 'userApi.properties()'],
+		['private static final SystemToast.SystemToastId TOAST = new SystemToast.SystemToastId(5000L);',
+			'private static final SystemToast.SystemToastIds TOAST = SystemToast.SystemToastIds.PERIODIC_NOTIFICATION;'],
+	])
+	// Before 1.20.2: skins as texture locations (com.orbitclient.compat.PlayerSkin), authlib 4, screens drawing their
+	// own background (Orbit's go through LegacyBackground), one scroll axis, numbered scoreboard slots.
+	oneWay(v.matches('<1.20.2'), [
+		['import net.minecraft.world.entity.player.PlayerSkin;', 'import com.orbitclient.compat.PlayerSkin;'],
+		['import net.minecraft.client.resources.PlayerSkin;', 'import com.orbitclient.compat.PlayerSkin;'],
+		['player.getSkin()', 'com.orbitclient.compat.PlayerSkin.of(player)'],
+		['mc.getGameProfile().id().equals(uuid)', 'mc.getUser().getGameProfile().getId().equals(uuid)'],
+		['mc.getSkinManager().createLookup(mc.getGameProfile(), false)', 'com.orbitclient.compat.PlayerSkin.lookup(mc.getUser().getGameProfile())'],
+		['mc.getSkinManager().createLookup(new GameProfile(uuid, name.isEmpty() ? "Player" : name), false)',
+			'com.orbitclient.compat.PlayerSkin.lookup(new GameProfile(uuid, name.isEmpty() ? "Player" : name))'],
+		['mc.services().sessionService().fetchProfile(uuid, false)',
+			'mc.getMinecraftSessionService().fillProfileProperties(new GameProfile(uuid, name.isEmpty() ? "Player" : name), false)'],
+		['mc.getSkinManager().createLookup(result.profile(), false)', 'com.orbitclient.compat.PlayerSkin.lookup(result)'],
+		['mc.services().sessionService().joinServer(user.getProfileId(), user.getAccessToken(), serverId)',
+			'mc.getMinecraftSessionService().joinServer(user.getGameProfile(), user.getAccessToken(), serverId)'],
+		['import com.mojang.authlib.yggdrasil.ProfileResult;', '// ProfileResult is new in 1.20.2'],
+		['CompletableFuture<ProfileResult>', 'CompletableFuture<Object>'],
+		['import net.minecraft.world.scores.DisplaySlot;', '// DisplaySlot is new in 1.20.2'],
+		['scoreboard.getDisplayObjective(DisplaySlot.LIST)', 'scoreboard.getDisplayObjective(0)'],
+		['mc.debugEntries.isOverlayVisible()', 'mc.options.renderDebug'],
+		['address, ServerData.Type.OTHER), false, null);', 'address, false), false);'],
+		['data.isRealm()', 'false'],
+		['minecraft.disconnect(new net.minecraft.client.gui.screens.GenericMessageScreen(Component.literal("Joining " + f.name())), false);',
+			'minecraft.clearLevel(new net.minecraft.client.gui.screens.GenericDirtMessageScreen(Component.literal("Joining " + f.name())));'],
+		// The entity is placed by its feet, without a translation (one line each: some sources have CRLF line ends).
+		['(x1 + x2) / 2f, (y1 + y2) / 2f, scale,', '(x1 + x2) / 2, Math.round((y1 + y2) / 2f + scale * (player.getBbHeight() / 2f + 0.16f)), Math.round(scale),'],
+		['new Vector3f(0, player.getBbHeight() / 2f + 0.16f, 0), pose, camera, player);', 'pose, camera, player);'],
+		// Implements LegacyBackground (added to the class below), so its @Override still holds.
+		['public void renderBackground(GuiGraphics g, int mx, int my, float delta) {', 'public void orbit$background(GuiGraphics g, int mx, int my, float delta) {'],
+		['super.renderBackground(g, mx, my, delta)', 'super.renderBackground(g)'],
+		['public class CrosshairEditorScreen extends Screen {', 'public class CrosshairEditorScreen extends Screen implements com.orbitclient.compat.LegacyBackground {'],
+		['public final class FriendsScreen extends net.minecraft.client.gui.screens.Screen {', 'public final class FriendsScreen extends net.minecraft.client.gui.screens.Screen implements com.orbitclient.compat.LegacyBackground {'],
+		['public class HudEditorScreen extends Screen {', 'public class HudEditorScreen extends Screen implements com.orbitclient.compat.LegacyBackground {'],
+		['public final class OrbitHomeScreen extends TitleScreen {', 'public final class OrbitHomeScreen extends TitleScreen implements com.orbitclient.compat.LegacyBackground {'],
+		['public class OrbitScreen extends Screen {', 'public class OrbitScreen extends Screen implements com.orbitclient.compat.LegacyBackground {'],
+		['public class WardrobeScreen extends Screen {', 'public class WardrobeScreen extends Screen implements com.orbitclient.compat.LegacyBackground {'],
+		['public boolean mouseScrolled(double mx, double my, double horizontal, double vertical) {',
+			'public boolean mouseScrolled(double mx, double my, double vertical) {\n\t\tdouble horizontal = 0;'],
+		['public boolean mouseScrolled(double mx, double my, double sx, double sy) {',
+			'public boolean mouseScrolled(double mx, double my, double sy) {\n\t\tdouble sx = 0;'],
+		['super.mouseScrolled(mx, my, sx, sy)', 'super.mouseScrolled(mx, my, sy)'],
 	])
 	oneWay(unobfuscated && v.matches('<26.3'), [
 		['new OptionsScreen(this, minecraft.options)', 'new OptionsScreen(this, minecraft.options, false)'],
@@ -237,6 +445,7 @@ processResources {
 }
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = javaVersion
+	it.options.compilerArgs += ['-Xmaxerrs', '10000']
 }
 
 java {
@@ -251,5 +460,8 @@ if (project.hasProperty('perfTest')) {
 	tasks.matching { it.name == 'runClientGameTest' }.configureEach {
 		it.jvmArgs '-Dorbit.perfTest=true', '-Dfabric.client.gametest.disableNetworkSynchronizer=true'
 		if (project.hasProperty('perfBenchmarkOnly')) it.jvmArgs '-Dorbit.perfBenchmarkOnly=true'
+		// -PperfModules="Motion Blur,Cape Physics": only these modules are measured one by one (default: all).
+		if (project.hasProperty('perfModules')) it.jvmArgs "-Dorbit.perfModules=${project.property('perfModules')}"
+		if (project.hasProperty('perfProfileOnly')) it.jvmArgs '-Dorbit.perfProfileOnly=true'
 	}
 }

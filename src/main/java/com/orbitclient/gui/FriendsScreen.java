@@ -470,7 +470,10 @@ public final class FriendsScreen extends net.minecraft.client.gui.screens.Screen
 	/** Joins the server a friend is on (leaving the current world or server first). */
 	private void join(Friends.Friend f) {
 		String address = f.server();
+		//? if >=1.21.9 {
 		if (minecraft.level != null) minecraft.disconnectFromWorld(Component.literal("Joining " + f.name()));
+		//?} else
+		/*if (minecraft.level != null) minecraft.disconnect(new net.minecraft.client.gui.screens.GenericMessageScreen(Component.literal("Joining " + f.name())), false);*/
 		ConnectScreen.startConnecting(new TitleScreen(), minecraft, ServerAddress.parseString(address),
 			new ServerData(f.name() + "'s server", address, ServerData.Type.OTHER), false, null);
 	}

@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screens.social.PlayerSocialManager;
 import net.minecraft.client.multiplayer.ProfileKeyPairManager;
 import net.minecraft.client.multiplayer.chat.report.ReportingContext;
 import net.minecraft.client.telemetry.ClientTelemetryManager;
+//? if >=1.21.9
 import net.minecraft.server.Services;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -22,9 +23,20 @@ public interface MinecraftAccountAccessor {
 	@Accessor("user")
 	void orbit$setUser(User user);
 
+	//? if >=1.21.9 {
 	@Mutable
 	@Accessor("services")
 	void orbit$setServices(Services services);
+	//?} else {
+	/*// Before 1.21.9 the session services were two fields instead of one Services.
+	@Mutable
+	@Accessor("authenticationService")
+	void orbit$setAuthenticationService(com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService service);
+
+	@Mutable
+	@Accessor("minecraftSessionService")
+	void orbit$setSessionService(com.mojang.authlib.minecraft.MinecraftSessionService service);
+	*///?}
 
 	@Mutable
 	@Accessor("profileFuture")

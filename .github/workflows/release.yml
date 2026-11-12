@@ -33,5 +33,21 @@ jobs:
             !versions/*/build/libs/*-sources.jar
           body: |
             Orbit Client for Fabric: one jar per Minecraft version (orbit-client-<version>+<Minecraft version>.jar), for
-            1.21.9, 1.21.10, 1.21.11, 26.1, 26.1.1, 26.1.2, 26.2 and 26.3. Needs Fabric API.
+            1.20, 1.20.1, 1.20.2, 1.20.3, 1.20.4, 1.20.5, 1.20.6, 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6,
+            1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1, 26.1.1, 26.1.2, 26.2 and 26.3. Needs Fabric API.
             Orbit Launcher installs and updates it automatically, picking the jar for each instance's Minecraft version.
+
+            Changes in 1.1.3:
+            - Motion Blur draws the screen twice per frame instead of three times (about a third less of its cost).
+            - Motion Blur is only offered from 1.21.6: older versions can't keep an image between frames, so it never worked there.
+            - Everything from 1.20 to 26.3 in one release: the first versions older than 1.21.9 in this line.
+
+            Not yet in this release (still being ported): 1.16.5, 1.17.1, 1.18.1, 1.18.2, 1.19 to 1.19.4, and the
+            Legacy Fabric versions 1.8.9 and 1.12.2. Their old releases are still available.
+
+            Known limits by version:
+            - 1.20 to 1.20.2, and 26.2 and 26.3: switching accounts in game points you to Orbit Launcher (in-game
+              switching works on 1.20.3 to 26.1).
+            - 1.20.4 and older: no menu blur, no Motion Blur, titles can't scale or hide, the tab list doesn't fold,
+              and Item Physics draws one item per stack.
+            - 1.21.5 and older: no Motion Blur, the text layout cache is off, and the crosshair's blend isn't inverted.

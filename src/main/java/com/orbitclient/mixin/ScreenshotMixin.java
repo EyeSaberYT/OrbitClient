@@ -13,8 +13,11 @@ import java.util.function.Consumer;
 @Mixin(Screenshot.class)
 public class ScreenshotMixin {
 	/** Screenshot: the chat message gets OPEN / FOLDER buttons and the image can go to the clipboard. */
+	//? if >=1.21.6 {
 	@ModifyVariable(method = "grab(Ljava/io/File;Ljava/lang/String;Lcom/mojang/blaze3d/pipeline/RenderTarget;ILjava/util/function/Consumer;)V",
 		at = @At("HEAD"), argsOnly = true)
+	//?} else
+	/*@ModifyVariable(method = "grab(Ljava/io/File;Ljava/lang/String;Lcom/mojang/blaze3d/pipeline/RenderTarget;Ljava/util/function/Consumer;)V", at = @At("HEAD"), argsOnly = true)*/
 	private static Consumer<Component> orbit$screenshotExtras(Consumer<Component> callback, File gameDir) {
 		return ScreenshotModule.wrap(gameDir, callback);
 	}

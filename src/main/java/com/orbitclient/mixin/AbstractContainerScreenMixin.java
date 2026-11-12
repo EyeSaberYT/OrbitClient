@@ -24,7 +24,15 @@ public class AbstractContainerScreenMixin {
 	@Inject(method = "renderBackground", at = @At("HEAD"))
 	private void orbit$menuBlur(GuiGraphics g, int mx, int my, float delta, CallbackInfo ci) {
 		if (MenuBlurModule.active() && (Object) this instanceof AbstractContainerScreen<?>) {
+			//? if >=1.21.6 {
 			((ScreenInvoker) this).orbit$renderBlurredBackground(g);
+			//?}
+			//? if >=1.21.2 <1.21.6 {
+			/*((ScreenInvoker) this).orbit$renderBlurredBackground();
+			*///?}
+			//? if >=1.20.5 <1.21.2 {
+			/*((ScreenInvoker) this).orbit$renderBlurredBackground(delta);
+			*///?}
 		}
 	}
 }

@@ -96,7 +96,6 @@ public final class CapeMesh {
 
 	private static void vertex(VertexConsumer vc, PoseStack.Pose pose, int light,
 								float x, float y, float z, float u, float v, float nx, float ny, float nz) {
-		vc.addVertex(pose, x, y, z).setColor(0xFFFFFFFF).setUv(u, v)
-			.setOverlay(OverlayTexture.NO_OVERLAY).setLight(light).setNormal(pose, nx, ny, nz);
+		com.orbitclient.util.Vertices.add(vc, pose, x, y, z, 0xFFFFFFFF, u, v, OverlayTexture.NO_OVERLAY, light, nx, ny, nz);
 	}
 }

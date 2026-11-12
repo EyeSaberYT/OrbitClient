@@ -26,6 +26,8 @@ public class PerformanceTest implements FabricClientGameTest {
 	private static final int SAMPLES = 5;
 	private static final int PLAYERS = 40;
 	private static final int HOLOGRAMS = 40;
+	/** Only a few named modules are measured: the general comparisons are skipped and theirs alternate 12 times. */
+	private static boolean quick;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -41,6 +43,9 @@ public class PerformanceTest implements FabricClientGameTest {
 		// so it doesn't depend on what else the computer is doing as much as frame rates do).
 		System.out.println("[PERF] " + context.computeOnClient(PerformanceTest::textLayoutBenchmark));
 		if (Boolean.getBoolean("orbit.perfBenchmarkOnly")) return;  // -PperfBenchmarkOnly: skip the frame-rate part
+		// A few modules named (-PperfModules): only those are measured, more carefully.
+		String wanted = System.getProperty("orbit.perfModules", "");
+		quick = !wanted.isBlank() && wanted.split(",").length <= 3;
 
 		try (TestSingleplayerContext sp = context.worldBuilder().create()) {
 			sp.getClientWorld().waitForChunksRender();
@@ -82,14 +87,103 @@ public class PerformanceTest implements FabricClientGameTest {
 			});
 			context.waitTicks(40);
 			System.out.println("[PERF] Text layouts over 2 seconds: " + context.computeOnClient(mc -> TextLayoutCache.stats()));
+
+			modules(context);
 		}
+	}
+
+	/**
+	 * Each module on its own, then all of them together, with the players and holograms in view
+	 * (-PperfModules="Motion Blur,Cape Physics": the modules a player has on; without it, every module).
+	 */
+	private static void modules(ClientGameTestContext context) {
+		String wanted = System.getProperty("orbit.perfModules", "");
+		List<String> names = wanted.isBlank() ? List.of() : List.of(wanted.split("\\s*,\\s*"));
+		List<Module> all = context.computeOnClient(mc -> ModuleManager.all().stream()
+			.filter(m -> names.isEmpty() || names.contains(m.getName())).toList());
+		List<Module> wereOn = context.computeOnClient(mc -> all.stream().filter(Module::isEnabled).toList());
+		// A full HD window: full-screen effects (Motion Blur) cost by the pixel.
+		context.getInput().resizeWindow(1920, 1080);
+		context.runOnClient(mc -> all.forEach(m -> m.setEnabled(false)));
+		context.waitTicks(40);
+		if (!Boolean.getBoolean("orbit.perfProfileOnly")) {  // -PperfProfileOnly: skip to the profile
+			System.out.printf("[PERF] %d modules, one at a time at 1920x1080, the others off:%n", all.size());
+			for (Module module : all) {
+				compare(context, "> " + module.getName(), mc -> module.setEnabled(false), mc -> module.setEnabled(true));
+				context.runOnClient(mc -> module.setEnabled(false));
+			}
+		}
+		compare(context, "> All of them together", mc -> all.forEach(m -> m.setEnabled(false)), mc -> all.forEach(m -> m.setEnabled(true)));
+		// Where Orbit's own render-thread time goes with all of them on.
+		context.runOnClient(mc -> all.forEach(m -> m.setEnabled(true)));
+		context.waitTicks(40);
+		// Motion Blur keeps two images and swaps them each frame (its default strength is 5).
+		System.out.println("[PERF] Motion Blur's kept images: " + context.computeOnClient(mc -> {
+			var chain = mc.getShaderManager().getPostChain(net.minecraft.resources.Identifier.fromNamespaceAndPath("orbitclient", "motion_blur_5"),
+				net.minecraft.client.renderer.LevelTargetBundle.MAIN_TARGETS);
+			if (chain == null) return "the effect didn't load";
+			var kept = ((com.orbitclient.mixin.PostChainAccessor) chain).orbit$persistentTargets();
+			return kept.keySet() + ", distinct: " + (new java.util.HashSet<>(kept.values()).size() == kept.size());
+		}));
+		profile(context, 30);
+		context.runOnClient(mc -> all.forEach(m -> m.setEnabled(wereOn.contains(m))));
+	}
+
+	/**
+	 * Samples the render thread every millisecond and prints the share of samples spent under Orbit's code:
+	 * each line is the innermost Orbit method on the stack and what it had called ("self" when nothing).
+	 * Mixin handlers count as Orbit's (their names contain orbit$).
+	 */
+	private static void profile(ClientGameTestContext context, int seconds) {
+		Thread render = context.computeOnClient(mc -> Thread.currentThread());
+		java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+		int[] totals = new int[2];  // samples, samples under Orbit code
+		java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean(true);
+		Thread sampler = new Thread(() -> {
+			while (running.get()) {
+				StackTraceElement[] stack = render.getStackTrace();
+				totals[0]++;
+				for (int i = 0; i < stack.length; i++) {
+					if (!isOrbit(stack[i])) continue;
+					totals[1]++;
+					String callee = i == 0 ? "self" : simple(stack[i - 1]);
+					counts.merge(simple(stack[i]) + " > " + callee, 1, Integer::sum);
+					break;
+				}
+				java.util.concurrent.locks.LockSupport.parkNanos(1_000_000);
+			}
+		}, "Orbit profiler");
+		sampler.setDaemon(true);
+		sampler.start();
+		context.waitTicks(seconds * 20);
+		running.set(false);
+		try {
+			sampler.join(1000);
+		} catch (InterruptedException ignored) {
+		}
+		System.out.printf("[PERF] Profile: %d samples, %.1f%% under Orbit's code%n", totals[0], 100.0 * totals[1] / Math.max(1, totals[0]));
+		counts.entrySet().stream().sorted((a, b) -> b.getValue() - a.getValue()).limit(40)
+			.forEach(e -> System.out.printf("[PERF]   %5.2f%%  %s%n", 100.0 * e.getValue() / Math.max(1, totals[0]), e.getKey()));
+	}
+
+	private static boolean isOrbit(StackTraceElement frame) {
+		String cls = frame.getClassName();
+		return (cls.startsWith("com.orbitclient.") && !cls.startsWith("com.orbitclient.test.")) || frame.getMethodName().contains("orbit$");
+	}
+
+	private static String simple(StackTraceElement frame) {
+		String cls = frame.getClassName();
+		return cls.substring(cls.lastIndexOf('.') + 1) + "." + frame.getMethodName();
 	}
 
 	/** Measures with a setting off, then on (the order alternates, so slow drift shows as noise, not cost). */
 	private static void compare(ClientGameTestContext context, String what, Consumer<Minecraft> off, Consumer<Minecraft> on) {
+		boolean module = what.startsWith("> ");
+		if (quick && !module) return;
+		int rounds = quick ? 12 : 2;
 		double offMs = 0, onMs = 0;
-		for (int round = 0; round < 2; round++) {
-			boolean offFirst = round == 0;
+		for (int round = 0; round < rounds; round++) {
+			boolean offFirst = round % 2 == 0;
 			context.runOnClient(offFirst ? off::accept : on::accept);
 			double first = frameMs(context);
 			context.runOnClient(offFirst ? on::accept : off::accept);
@@ -97,15 +191,17 @@ public class PerformanceTest implements FabricClientGameTest {
 			offMs += offFirst ? first : second;
 			onMs += offFirst ? second : first;
 		}
-		offMs /= 2;
-		onMs /= 2;
+		// The second round ends with it off: left on, as it was, for what's measured next.
+		context.runOnClient(on::accept);
+		offMs /= rounds;
+		onMs /= rounds;
 		System.out.printf("[PERF] %-28s on %6.3f ms (%4.0f FPS), off %6.3f ms (%4.0f FPS): costs %+6.3f ms%n",
 			what, onMs, 1000 / onMs, offMs, 1000 / offMs, onMs - offMs);
 	}
 
 	/** Average frame time in milliseconds, from the game's frames-per-second counter (one reading a second). */
 	private static double frameMs(ClientGameTestContext context) {
-		context.waitTicks(40);
+		context.waitTicks(quick ? 20 : 40);
 		double total = 0;
 		for (int i = 0; i < SAMPLES; i++) {
 			context.waitTicks(20);

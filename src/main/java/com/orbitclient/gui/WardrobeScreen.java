@@ -18,8 +18,10 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
+//? if >=1.21.2 {
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
+//?}
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.joml.Quaternionf;
@@ -329,11 +331,39 @@ public class WardrobeScreen extends Screen {
 
 	private void renderPlayer(GuiGraphics g, int x1, int y1, int x2, int y2) {
 		if (minecraft.player == null) return;
+		//? if <1.21.6 {
+		/*// Before 1.21.6 the GUI draws the entity itself: turned like the preview for this one draw, then put back.
+		var player = minecraft.player;
+		float body = player.yBodyRot, bodyO = player.yBodyRotO, head = player.yHeadRot, headO = player.yHeadRotO;
+		float yRot = player.getYRot(), yRotO = player.yRotO, xRot = player.getXRot(), xRotO = player.xRotO;
+		float facing = 180f + yaw;
+		player.yBodyRot = player.yBodyRotO = player.yHeadRot = player.yHeadRotO = facing;
+		player.setYRot(facing);
+		player.yRotO = facing;
+		player.setXRot(0);
+		player.xRotO = 0;
+		float scale = (y2 - y1) / 3.1f;
+		Quaternionf pose = new Quaternionf().rotateZ((float) Math.PI);
+		Quaternionf camera = new Quaternionf().rotateX((float) Math.toRadians(-8));
+		pose.mul(camera);
+		net.minecraft.client.gui.screens.inventory.InventoryScreen.renderEntityInInventory(g, (x1 + x2) / 2f, (y1 + y2) / 2f, scale,
+			new Vector3f(0, player.getBbHeight() / 2f + 0.16f, 0), pose, camera, player);
+		player.yBodyRot = body;
+		player.yBodyRotO = bodyO;
+		player.yHeadRot = head;
+		player.yHeadRotO = headO;
+		player.setYRot(yRot);
+		player.yRotO = yRotO;
+		player.setXRot(xRot);
+		player.xRotO = xRotO;
+		*///?} else {
 		var renderer = minecraft.getEntityRenderDispatcher().getRenderer(minecraft.player);
 		EntityRenderState state = renderer.createRenderState(minecraft.player, 1f);
+		//? if >=1.21.9 {
 		state.lightCoords = 0xF000F0;
 		state.shadowPieces.clear();
 		state.outlineColor = 0;
+		//?}
 		if (state instanceof LivingEntityRenderState living) {
 			living.bodyRot = 180f + yaw;
 			living.yRot = 0;
@@ -346,6 +376,7 @@ public class WardrobeScreen extends Screen {
 		pose.mul(camera);
 		// Centered on feet-to-hat-top rather than feet-to-head, so the hat doesn't poke out of the core.
 		g.submitEntityRenderState(state, scale, new Vector3f(0, state.boundingBoxHeight / 2f + 0.16f, 0), pose, camera, x1, y1, x2, y2);
+		//?}
 	}
 
 	private void renderTooltip(GuiGraphics g, int mx, int my) {

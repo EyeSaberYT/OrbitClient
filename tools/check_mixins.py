@@ -83,7 +83,7 @@ class Classes:
                 self.cache[cls] = None
         return self.cache[cls]
 
-    def has(self, cls, member, seen=None, descriptor=None):
+    def has(self, cls, member, seen=None, descriptor=None, inherited=True):
         """True/False, or None when the class isn't in Minecraft (a library or Fabric class)."""
         info = self.info(cls)
         if info is None:
@@ -91,6 +91,8 @@ class Classes:
         members, supers = info
         if member in members and (descriptor is None or descriptor in members[member]):
             return True
+        if not inherited:
+            return False
         seen = seen or set()
         for parent in supers:
             if parent in seen or parent.startswith('java.'):
@@ -109,6 +111,9 @@ def active_mixins(gen):
     if plugin.exists():
         code = strip_comments(plugin.read_text(encoding='utf-8'))
         names += re.findall(r'mixins\.add\("(\w+)"\)', code)
+        # Mixins the plugin turns off for this version (shouldApplyMixin: endsWith(".Name") ... return false).
+        skipped = set(re.findall(r'endsWith\("\.(\w+)"\)\)\s*return false', code))
+        names = [n for n in names if n not in skipped]
     return names
 
 
@@ -119,6 +124,11 @@ def strip_comments(code):
 
 def resolve(simple, imports, package):
     """A class name as written in the source, to its binary name."""
+    if simple[0].islower() and '.' in simple:
+        # Written out in full (net.minecraft.client.gui.Gui); nested classes follow the first capitalized part.
+        parts = simple.split('.')
+        first = next((i for i, p in enumerate(parts) if p[0].isupper()), len(parts))
+        return '.'.join(parts[:first + 1]) + ''.join('$' + p for p in parts[first + 1:])
     outer, _, inner = simple.partition('.')
     base = imports.get(outer)
     if base is None:
@@ -167,7 +177,7 @@ def check(version):
                 name, paren, rest = selector.partition('(')
                 wanted.append(('method', name))
                 if paren:  # a full signature: that exact overload has to exist
-                    found = [classes.has(t, name, descriptor='(' + rest) for t in targets]
+                    found = [classes.has(t, name, descriptor='(' + rest, inherited=False) for t in targets]
                     if not any(found) and any(f is not None for f in found):
                         problems.append(f'{mixin}: no overload {selector}')
         wanted += [('accessor', n) for n in re.findall(r'@(?:Accessor|Invoker)\(\s*(?:value\s*=\s*)?"([^"]+)"', code)]
@@ -176,7 +186,8 @@ def check(version):
         for name_kind, name in wanted:
             if name in ('<init>', '<clinit>'):
                 continue
-            found = [classes.has(t, name) for t in targets]
+            # Injectors only reach methods the target declares itself; shadows and accessors also reach inherited ones.
+            found = [classes.has(t, name, inherited=name_kind != 'method') for t in targets]
             if not any(found) and any(f is not None for f in found):
                 problems.append(f'{mixin}: {name_kind} "{name}" not in {", ".join(t.split(".")[-1] for t in targets)}')
         for desc in re.findall(r'target\s*=\s*"([^"]+)"', code):

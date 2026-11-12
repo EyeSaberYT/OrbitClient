@@ -304,8 +304,8 @@ public final class VoxelModel {
 			float nx = normals[f * 3], ny = normals[f * 3 + 1], nz = normals[f * 3 + 2];
 			int o = f * 12;
 			for (int v = 0; v < 4; v++) {
-				consumer.addVertex(pose, corners[o + v * 3] * s, corners[o + v * 3 + 1] * s, corners[o + v * 3 + 2] * s)
-					.setColor(color).setUv(0.5f, 0.5f).setOverlay(OverlayTexture.NO_OVERLAY).setLight(lit).setNormal(pose, nx, ny, nz);
+				com.orbitclient.util.Vertices.add(consumer, pose, corners[o + v * 3] * s, corners[o + v * 3 + 1] * s, corners[o + v * 3 + 2] * s,
+					color, 0.5f, 0.5f, OverlayTexture.NO_OVERLAY, lit, nx, ny, nz);
 			}
 		}
 	}

@@ -10,13 +10,34 @@ import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.world.entity.Entity;
 
 /** Draws a player's worn cosmetics (all but the cape, which the cape layer draws). */
+//? if >=1.21.2 {
 public class CosmeticsLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
 	public CosmeticsLayer(RenderLayerParent<AvatarRenderState, PlayerModel> parent) {
 		super(parent);
 	}
+//?} else {
+/*public class CosmeticsLayer extends RenderLayer<net.minecraft.client.player.AbstractClientPlayer, PlayerModel<net.minecraft.client.player.AbstractClientPlayer>> {
+	public CosmeticsLayer(RenderLayerParent<net.minecraft.client.player.AbstractClientPlayer, PlayerModel<net.minecraft.client.player.AbstractClientPlayer>> parent) {
+		super(parent);
+	}
+*///?}
 
+	//? if >=1.21.9 {
 	@Override
 	public void submit(PoseStack pose, SubmitNodeCollector collector, int light, AvatarRenderState state, float yRot, float xRot) {
+	//?}
+	//? if >=1.21.2 <1.21.9 {
+	/*@Override
+	public void render(PoseStack pose, net.minecraft.client.renderer.MultiBufferSource buffers, int light, AvatarRenderState state, float yRot, float xRot) {
+		SubmitNodeCollector collector = new SubmitNodeCollector(buffers);
+	*///?}
+	//? if <1.21.2 {
+	/*@Override
+	public void render(PoseStack pose, net.minecraft.client.renderer.MultiBufferSource buffers, int light, net.minecraft.client.player.AbstractClientPlayer player,
+	                   float limbSwing, float limbSwingAmount, float partialTick, float age, float headYaw, float headPitch) {
+		SubmitNodeCollector collector = new SubmitNodeCollector(buffers);
+		AvatarRenderState state = AvatarRenderState.of(player, partialTick);
+	*///?}
 		if (state.isInvisible) return;
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.level == null) return;

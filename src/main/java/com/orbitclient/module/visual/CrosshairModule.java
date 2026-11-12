@@ -6,9 +6,11 @@ import com.orbitclient.module.Module;
 import com.orbitclient.setting.*;
 import com.orbitclient.util.Anim;
 import com.orbitclient.util.Render2D;
+//? if >=1.21.6 {
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderPipelines;
+//?}
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.Enemy;
@@ -184,7 +186,16 @@ public class CrosshairModule extends Module {
 		int ox = gx * guiScale + (guiScale - cell) / 2 - c * cell;
 		int oy = gy * guiScale + (guiScale - cell) / 2 - c * cell;
 		// GUI_INVERT is vanilla's inverting blend for plain fills (CROSSHAIR is the same blend but needs a texture).
+		//? if >=1.21.7 {
 		RenderPipeline pipeline = blend ? RenderPipelines.GUI_INVERT : RenderPipelines.GUI;
+		//?}
+		//? if >=1.21.6 <1.21.7 {
+		/*RenderPipeline pipeline = RenderPipelines.GUI; // 1.21.6 has no inverting fill: blend draws in its color
+		*///?}
+		//? if <1.21.6 {
+		/*// Before 1.21.6 GUI fills had no inverting blend either: blend draws in its color.
+		net.minecraft.client.renderer.RenderType pipeline = net.minecraft.client.renderer.RenderType.gui();
+		*///?}
 		// The inverting blend has to run in its own layer after what's behind it (vanilla does the same),
 		// otherwise menus draw it before their own backgrounds and it disappears.
 		if (blend) g.nextStratum();

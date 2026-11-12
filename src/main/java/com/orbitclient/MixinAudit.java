@@ -3,8 +3,12 @@ package com.orbitclient;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.orbitclient.gui.OrbitHomeScreen;
 import com.orbitclient.mixin.OrbitMixinPlugin;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen;
+import net.minecraft.client.gui.screens.Screen;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AnnotationNode;
@@ -21,10 +25,12 @@ import java.util.Set;
 /**
  * Development check, off unless asked for (`gradlew :<version>:runClient -PmixinAudit`): once the game has
  * started, loads every class Orbit's mixins target, so each mixin is applied now instead of when its class
- * is first used, then quits with status 0 if all applied and 1 if any failed.
+ * is first used, then waits for the first menu (it must be Orbit's home screen) and quits with status 0 if
+ * all of that worked and 1 if anything failed.
  */
 public final class MixinAudit {
 	private static final String MIXIN = "Lorg/spongepowered/asm/mixin/Mixin;";
+	private static boolean reported;
 
 	private MixinAudit() {
 	}
@@ -47,10 +53,36 @@ public final class MixinAudit {
 					failures.add(target + ": " + causes(error));
 				}
 			}
-			for (String failure : failures) System.out.println("ORBIT-MIXIN-AUDIT FAILED " + failure);
-			System.out.println("ORBIT-MIXIN-AUDIT " + (failures.isEmpty() ? "OK" : "FAILED") + ": " + targets.size() + " target classes");
-			Runtime.getRuntime().halt(failures.isEmpty() ? 0 : 1);
+			if (!failures.isEmpty()) report(failures, targets.size() + " target classes", null);
+			// Then the first menu once loading is done: Orbit's home screen, not the vanilla title screen.
+			int[] ticks = {0};
+			ClientTickEvents.END_CLIENT_TICK.register(mc -> {
+				Screen screen = mc.screen;
+				if (++ticks[0] > 1200) {
+					failures.add("no menu opened within a minute of starting" + (screen == null ? "" : " (on " + screen.getClass().getName() + ")"));
+					report(failures, targets.size() + " target classes", mc);
+				} else if (mc.getOverlay() == null && screen instanceof AccessibilityOnboardingScreen) {
+					// A new game folder asks about accessibility first. Going on from it is what the game does
+					// then: remember it was answered and open the title screen (which must become Orbit's).
+					mc.options.onboardAccessibility = false;
+					mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen());
+				} else if (mc.getOverlay() == null && screen != null) {
+					if (!(screen instanceof OrbitHomeScreen)) failures.add("the first menu is " + screen.getClass().getName() + ", not Orbit's home screen");
+					report(failures, targets.size() + " target classes, first menu " + screen.getClass().getSimpleName(), mc);
+				}
+			});
 		});
+	}
+
+	/** Prints the result and quits: normally when it passed (halting mid-frame can crash the driver), at once with 1 when not. */
+	private static void report(List<String> failures, String summary, net.minecraft.client.Minecraft mc) {
+		// The game keeps ticking while it stops.
+		if (reported) return;
+		reported = true;
+		for (String failure : failures) System.out.println("ORBIT-MIXIN-AUDIT FAILED " + failure);
+		System.out.println("ORBIT-MIXIN-AUDIT " + (failures.isEmpty() ? "OK" : "FAILED") + ": " + summary);
+		if (failures.isEmpty() && mc != null) mc.stop();
+		else Runtime.getRuntime().halt(failures.isEmpty() ? 0 : 1);
 	}
 
 	/** Every mixin this version applies: the config's list plus the version-specific ones from the plugin. */
