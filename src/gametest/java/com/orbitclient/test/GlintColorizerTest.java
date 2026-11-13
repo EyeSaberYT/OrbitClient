@@ -20,6 +20,7 @@ public class GlintColorizerTest implements FabricClientGameTest {
 	@Override
 	public void runTest(ClientGameTestContext context) {
 		if (Boolean.getBoolean("orbit.perfTest")) return;  // a PerformanceTest run
+		if (Boolean.getBoolean("orbit.shotsOnly")) return;  // a screenshots-only run (-PshotsOnly)
 		try (TestSingleplayerContext sp = context.worldBuilder().create()) {
 			sp.getClientWorld().waitForChunksRender();
 			GlintColorizerModule glint = ModuleManager.get(GlintColorizerModule.class);

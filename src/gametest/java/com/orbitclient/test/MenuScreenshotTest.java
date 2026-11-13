@@ -23,6 +23,21 @@ import org.lwjgl.glfw.GLFW;
  */
 @SuppressWarnings("UnstableApiUsage")
 public class MenuScreenshotTest implements FabricClientGameTest {
+	/**
+	 * -PshotsOnly: pictures meant to be shown (the website). A generated world instead of the flat test
+	 * world, and every cosmetic counts as owned so they can be seen worn: the test account can't sign in,
+	 * and nothing here reaches a real account or the released mod (this is test code).
+	 */
+	private static final boolean SHOWCASE = Boolean.getBoolean("orbit.shotsOnly");
+
+	/** In a showcase run: the whole catalogue is this test account's, and the chat box is empty. */
+	private static void showcaseCosmetics(net.minecraft.client.Minecraft mc) {
+		if (!SHOWCASE) return;
+		java.util.Set<String> all = new java.util.HashSet<>();
+		for (var c : com.orbitclient.cosmetics.Cosmetics.all()) all.add(c.id);
+		com.orbitclient.cosmetics.CosmeticManager.setOwned(mc.getUser().getProfileId(), all);
+	}
+
 	/** Adds a ready-made waypoint (the manager only creates them at the player's position). */
 	private static void addWaypoint(com.orbitclient.waypoint.Waypoint wp) {
 		var array = new com.google.gson.JsonArray();
@@ -95,8 +110,18 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 		context.runOnClient(mc -> {
 			if (!(mc.screen instanceof OrbitHomeScreen)) throw new AssertionError("Closing a screen showed " + mc.screen + ", not the Orbit home screen");
 		});
-		try (TestSingleplayerContext sp = context.worldBuilder().create()) {
+		var worldBuilder = context.worldBuilder();
+		if (SHOWCASE) worldBuilder.setUseConsistentSettings(false).adjustSettings(settings -> settings.setSeed("orbit"));
+		try (TestSingleplayerContext sp = worldBuilder.create()) {
 			sp.getClientWorld().waitForChunksRender();
+			if (SHOWCASE) {
+				// Daylight, clear sky, nothing attacking, and standing on the surface looking level.
+				for (String command : new String[]{"time set 6000", "weather clear", "difficulty peaceful", "gamemode creative @p"}) sp.getServer().runCommand(command);
+				context.runOnClient(mc -> mc.player.setXRot(5));
+				context.waitTicks(5);
+				context.runOnClient(mc -> mc.gui.getChat().clearMessages(true));
+				context.waitTicks(60);
+			}
 			context.runOnClient(mc -> {
 				ModuleManager.get(FpsModule.class).setEnabled(true);
 				ModuleManager.get(CpsModule.class).setEnabled(true);
@@ -258,7 +283,7 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 			context.runOnClient(mc -> {
 				var screen = mc.screen;
 				int h = mc.getWindow().getGuiScaledHeight();
-				var shift = new net.minecraft.client.input.MouseButtonInfo(0, org.lwjgl.glfw.GLFW.GLFW_MOD_SHIFT);
+				var shift = new net.minecraft.client.input.MouseButtonInfo(GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_MOD_SHIFT);
 				screen.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(20, h - 40 - 4.5, shift), false);
 				String newest = mc.keyboardHandler.getClipboard();
 				screen.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(20, h - 40 - 9 * 2.5, shift), false);
@@ -325,7 +350,8 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 			context.takeScreenshot("orbit-13f-saturation");
 
 			// Wavey Capes: a test cape, third person from behind, running forward (west).
-			sp.getServer().runCommand("tp @p ~ -60 ~ 90 10");
+			sp.getServer().runCommand(SHOWCASE ? "tp @p ~ ~ ~ 90 10" : "tp @p ~ -60 ~ 90 10");
+			if (SHOWCASE) context.runOnClient(mc -> mc.gui.getChat().clearMessages(true));
 			context.runOnClient(mc -> {
 				var img = new com.mojang.blaze3d.platform.NativeImage(64, 32, true);
 				for (int y = 0; y < 32; y++) for (int x = 0; x < 64; x++) {
@@ -383,6 +409,7 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 			for (int o = 0; o < outfits.length; o++) {
 				String[] outfit = outfits[o];
 				context.runOnClient(mc -> {
+					showcaseCosmetics(mc);
 					for (var slot : com.orbitclient.cosmetics.CosmeticSlot.values()) com.orbitclient.cosmetics.CosmeticManager.remove(slot);
 					for (String id : outfit) {
 						var c = com.orbitclient.cosmetics.Cosmetics.get(id);
@@ -402,6 +429,7 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 			}
 			// The wardrobe, wearing the first outfit again.
 			context.runOnClient(mc -> {
+				showcaseCosmetics(mc);
 				for (var slot : com.orbitclient.cosmetics.CosmeticSlot.values()) com.orbitclient.cosmetics.CosmeticManager.remove(slot);
 				for (String id : new String[]{"eclipse", "crown", "wisp", "angel_wings"}) {
 					var c = com.orbitclient.cosmetics.Cosmetics.get(id);
@@ -414,6 +442,9 @@ public class MenuScreenshotTest implements FabricClientGameTest {
 			context.runOnClient(mc -> System.out.println("[SYNC] " + com.orbitclient.cosmetics.CosmeticSync.status()));
 			context.setScreen(com.orbitclient.gui.WardrobeScreen::new);
 			context.waitTicks(20);
+			// The wardrobe asks the server again when it opens; in a showcase run the catalogue stays this account's.
+			context.runOnClient(MenuScreenshotTest::showcaseCosmetics);
+			context.waitTicks(5);
 			context.takeScreenshot("orbit-31-wardrobe-capes");
 			context.runOnClient(mc -> ((com.orbitclient.gui.WardrobeScreen) mc.screen).showTab(com.orbitclient.cosmetics.CosmeticSlot.HAT));
 			context.waitTicks(30);

@@ -20,6 +20,7 @@ public class CapeMotionTest implements FabricClientGameTest {
 	@Override
 	public void runTest(ClientGameTestContext context) {
 		if (Boolean.getBoolean("orbit.perfTest")) return;  // a PerformanceTest run
+		if (Boolean.getBoolean("orbit.shotsOnly")) return;  // a screenshots-only run (-PshotsOnly)
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.START_CLIENT_TICK.register(mc -> {
 			if (sideView && mc.player != null) mc.player.setYBodyRot(90);
 		});

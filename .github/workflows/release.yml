@@ -62,14 +62,14 @@ jobs:
             - 1.14 to 1.14.4, and 1.8.2 to 1.8.9, 1.9.4, 1.10.2, 1.11.2, 1.12.2 and 1.13.2 (Legacy Fabric): cosmetics
               and the wardrobe only. These need Java 17 or newer, which Orbit Launcher picks by itself.
 
-            Changes in 1.1.4:
-            - Fixed: nothing could be clicked on Minecraft 26.3. That version numbers the mouse buttons differently,
-              and Orbit's screens ignored every left click.
-            - Fixed: options failed to save while 26.3 started.
-            - Many more Minecraft versions: everything from 1.15 to 1.19.4 joins 1.20 to 26.3, and the cosmetics
-              builds for 1.8 to 1.14 are part of the release.
-            - Cosmetics draw about three times faster: flat areas of a model are drawn as one face instead of one
-              per voxel.
+            Changes in 1.1.5:
+            - Fixed: turning on Motion Blur on Minecraft 26.3 threw you out of the world (its shader did not
+              compile there).
+            - Fixed: shift-clicking a chat message to copy it crashed the game on 26.2 and 26.3. The same fault
+              was in the Chat mod's stacking of repeated messages.
+
+            In 1.1.4: clicks work on 26.3, every release from 1.15 to 26.3 is covered, and the cosmetics builds
+            for 1.8 to 1.14 are part of the release.
 
             Known limits by version:
             - 1.20.2 and older, and 26.2 and 26.3: switching accounts in game points you to Orbit Launcher (in-game

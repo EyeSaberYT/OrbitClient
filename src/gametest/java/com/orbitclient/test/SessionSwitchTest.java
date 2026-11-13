@@ -18,6 +18,7 @@ public class SessionSwitchTest implements FabricClientGameTest {
 	@Override
 	public void runTest(ClientGameTestContext context) {
 		if (Boolean.getBoolean("orbit.perfTest")) return;  // a PerformanceTest run
+		if (Boolean.getBoolean("orbit.shotsOnly")) return;  // a screenshots-only run (-PshotsOnly)
 		UUID uuid = UUID.fromString("0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0");
 		CompletableFuture<Void> switched = context.computeOnClient(mc -> SessionSwitcher.switchTo("OrbitTestAcct", uuid, "not-a-real-token"));
 		long deadline = System.currentTimeMillis() + 30_000;

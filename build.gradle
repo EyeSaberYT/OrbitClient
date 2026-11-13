@@ -188,7 +188,7 @@ tasks.register('exportCosmetics', JavaExec) {
 		['mc.gui.getTabList()', 'mc.gui.hud.getTabList()'],
 		['mc.gui.setOverlayMessage(', 'mc.gui.hud.setOverlayMessage('],
 		['mc.gui.getChat().getLinesPerPage()', '10'],
-		['Minecraft.getInstance().gui.getChat()', 'Minecraft.getInstance().gui.chatListener()'],
+		['Minecraft.getInstance().gui.getChat()', 'Minecraft.getInstance().gui.hud.getChat()'],
 		['Gui.getMobEffectSprite(', 'Hud.getMobEffectSprite('],
 		['import net.minecraft.client.gui.Gui;', 'import net.minecraft.client.gui.Gui;\nimport net.minecraft.client.gui.Hud;'],
 		['Items.RED_DYE', 'Items.WOOL.red()'],
@@ -196,7 +196,7 @@ tasks.register('exportCosmetics', JavaExec) {
 		['mc.options.hideGui', 'mc.gui.hud.isHidden()'],
 		['mc.getMainRenderTarget()', 'mc.gameRenderer.mainRenderTarget()'],
 		['mc.gameRenderer.getMainCamera()', 'mc.gameRenderer.mainCamera()'],
-		['mc.gui.getChat()', 'mc.gui.chatListener()'],
+		['mc.gui.getChat()', 'mc.gui.hud.getChat()'],
 		['mc.screen', 'mc.gui.screen()'],
 		['Minecraft.getInstance().screen', 'Minecraft.getInstance().gui.screen()'],
 		['client.screen', 'client.gui.screen()'],
@@ -210,6 +210,13 @@ tasks.register('exportCosmetics', JavaExec) {
 	])
 	// 26.3 moved the render API to com.mojang.renderpearl and renamed key input.
 	oneWay(v.matches('>=26.3'), [
+		// The game tests: the test API's world context was renamed, the HUD is hidden through a toggle, and
+		// the chat box moved onto the HUD.
+		['sp.getClientWorld()', 'sp.getConnection()'],
+		['mc.options.hideGui = true', '{ if (!mc.gui.hud.isHidden()) mc.gui.hud.toggle(); }'],
+		['mc.options.hideGui = false', '{ if (mc.gui.hud.isHidden()) mc.gui.hud.toggle(); }'],
+		['mc.gui.getChat().addMessage(', 'mc.gui.hud.getChat().addClientSystemMessage('],
+		['(com.orbitclient.mixin.ChatComponentAccessor) mc.gui.getChat()', '(com.orbitclient.mixin.ChatComponentAccessor) mc.gui.hud.getChat()'],
 		['com.mojang.blaze3d.textures.AddressMode', 'com.mojang.renderpearl.api.textures.AddressMode'],
 		['com.mojang.blaze3d.textures.FilterMode', 'com.mojang.renderpearl.api.textures.FilterMode'],
 		['com.mojang.blaze3d.pipeline.RenderPipeline', 'com.mojang.renderpearl.api.pipeline.RenderPipeline'],
@@ -631,6 +638,19 @@ processResources {
 	filesMatching(["fabric.mod.json", "*.mixins.json"]) {
 		expand props
 	}
+	// 26.3 compiles shaders to SPIR-V, which wants a location on every input and output (as its own post
+	// shaders have). Older versions keep the plain declarations: not every driver takes these there.
+	def spirv = stonecutter.current.parsed.matches('>=26.3')
+	inputs.property 'spirvShaders', spirv
+	if (spirv) {
+		filesMatching('assets/orbitclient/shaders/post/*.fsh') {
+			filter { String line ->
+				line.replace('#version 330', '#version 330' + System.lineSeparator() + '#extension GL_ARB_separate_shader_objects : require')
+					.replaceFirst(/^in vec2 texCoord;/, 'layout(location = 0) in vec2 texCoord;')
+					.replaceFirst(/^out vec4 fragColor;/, 'layout(location = 0) out vec4 fragColor;')
+			}
+		}
+	}
 }
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = javaVersion
@@ -640,6 +660,14 @@ tasks.withType(JavaCompile).configureEach {
 java {
 	sourceCompatibility = JavaVersion.toVersion(javaVersion)
 	targetCompatibility = JavaVersion.toVersion(javaVersion)
+}
+
+// `gradlew runClientGameTest -PshotsOnly` runs only MenuScreenshotTest: every screen and feature, as pictures
+// in run/screenshots.
+if (project.hasProperty('shotsOnly')) {
+	tasks.matching { it.name == 'runClientGameTest' }.configureEach {
+		it.jvmArgs '-Dorbit.shotsOnly=true'
+	}
 }
 
 // `gradlew runClientGameTest -PperfTest` runs only PerformanceTest: where frame time goes.
