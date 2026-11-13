@@ -1,0 +1,18 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		maven {
+			name = 'legacy-fabric'
+			url = 'https://maven.legacyfabric.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+// Orbit Client for the old engine (Minecraft 1.8.9 on Legacy Fabric). A separate build from the main
+// client: those versions have none of the classes it is written against. It shares the cosmetics.
+rootProject.name = 'orbit-client-legacy'

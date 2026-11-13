@@ -1,5 +1,7 @@
 package com.orbitclient.mixin;
 
+// Options became OptionInstance in 1.19 (before: LightTextureGammaMixin and MouseSensitivityMixin).
+//? if >=1.19 {
 import com.orbitclient.module.mechanics.ZoomModule;
 import com.orbitclient.module.visual.FullbrightModule;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
@@ -32,3 +34,4 @@ public class OptionInstanceMixin {
 		return value;
 	}
 }
+//?}

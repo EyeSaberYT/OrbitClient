@@ -16,8 +16,14 @@ public class ScreenshotMixin {
 	//? if >=1.21.6 {
 	@ModifyVariable(method = "grab(Ljava/io/File;Ljava/lang/String;Lcom/mojang/blaze3d/pipeline/RenderTarget;ILjava/util/function/Consumer;)V",
 		at = @At("HEAD"), argsOnly = true)
-	//?} else
-	/*@ModifyVariable(method = "grab(Ljava/io/File;Ljava/lang/String;Lcom/mojang/blaze3d/pipeline/RenderTarget;Ljava/util/function/Consumer;)V", at = @At("HEAD"), argsOnly = true)*/
+	//?}
+	//? if >=1.17.1 <1.21.6 {
+	/*@ModifyVariable(method = "grab(Ljava/io/File;Ljava/lang/String;Lcom/mojang/blaze3d/pipeline/RenderTarget;Ljava/util/function/Consumer;)V", at = @At("HEAD"), argsOnly = true)
+	*///?}
+	//? if <1.17.1 {
+	/*// Before 1.17.1 the screenshot's size was passed in.
+	@ModifyVariable(method = "grab(Ljava/io/File;Ljava/lang/String;IILcom/mojang/blaze3d/pipeline/RenderTarget;Ljava/util/function/Consumer;)V", at = @At("HEAD"), argsOnly = true)
+	*///?}
 	private static Consumer<Component> orbit$screenshotExtras(Consumer<Component> callback, File gameDir) {
 		return ScreenshotModule.wrap(gameDir, callback);
 	}

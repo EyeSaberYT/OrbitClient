@@ -71,6 +71,22 @@ public final class Cosmetic {
 		this.capeFrames = capeFrames;
 	}
 
+	//? if <1.21 {
+	/*/^* Development check (MixinAudit): draws every cosmetic's model once into the entity buffer, the way players' are drawn. ^/
+	public static int drawAllOnce(net.minecraft.client.renderer.MultiBufferSource.BufferSource buffers) {
+		PoseStack pose = new PoseStack();
+		com.mojang.blaze3d.vertex.VertexConsumer consumer = buffers.getBuffer(Voxels.TYPE);
+		int drawn = 0;
+		for (Cosmetic c : Cosmetics.all()) {
+			if (c.iconModel == null) continue;
+			c.iconModel.render(pose.last(), consumer, VoxelModel.FULL_BRIGHT, c.defaultColor, 1f);
+			drawn++;
+		}
+		buffers.endBatch();
+		return drawn;
+	}
+	*///?}
+
 	/** The cape texture to show right now (capes animate through their frames). */
 	public Identifier capeTexture(double time) {
 		int frame = capeFrames <= 1 ? 0 : (int) Math.floor(time * 10) % capeFrames;

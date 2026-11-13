@@ -54,8 +54,15 @@ public final class GuiBlit {
 		tint(graphics, color);
 		//? if >=1.20.2 {
 		PlayerFaceRenderer.draw(graphics, skin, x, y, size);
-		//?} else
-		/^PlayerFaceRenderer.draw(graphics, skin.texture(), x, y, size);^/
+		//?}
+		//? if >=1.20 <1.20.2 {
+		/^PlayerFaceRenderer.draw(graphics, skin.texture(), x, y, size);
+		^///?}
+		//? if <1.20 {
+		/^// The face, then the hat layer over it (64x64 skin texture).
+		graphics.blit(skin.texture(), x, y, size, size, 8f, 8f, 8, 8, 64, 64);
+		graphics.blit(skin.texture(), x, y, size, size, 40f, 8f, 8, 8, 64, 64);
+		^///?}
 		untint(graphics);
 	}
 

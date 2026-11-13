@@ -67,7 +67,7 @@ public final class ModuleManager {
 		register(new FreelookModule());
 		register(new FullbrightModule());
 		register(DebugToggleModule.hitbox());
-		//? if >=1.21.6
+		//? if >=1.21.2
 		register(new MotionBlurModule());
 		register(new BlockOutlineModule());
 		register(new HitColorModule());

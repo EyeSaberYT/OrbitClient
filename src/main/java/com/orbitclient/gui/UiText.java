@@ -16,6 +16,16 @@ public final class UiText {
 		return Minecraft.getInstance().font;
 	}
 
+	/** The width of styled text. */
+	public static int width(Component c) {
+		//? if >=1.16 {
+		return font().width(c);
+		//?} else {
+		/*// Before 1.16 the font measures text with formatting codes.
+		return font().width(c.getColoredString());
+		*///?}
+	}
+
 	public static Component styled(String s, boolean bold) {
 		return bold ? Component.literal(s).withStyle(ChatFormatting.BOLD) : Component.literal(s);
 	}
@@ -23,7 +33,7 @@ public final class UiText {
 	/** Width of letter-spaced text (used for headings and buttons). */
 	public static int spacedWidth(String s, boolean bold) {
 		int w = 0;
-		for (int i = 0; i < s.length(); i++) w += font().width(styled(String.valueOf(s.charAt(i)), bold)) + 1;
+		for (int i = 0; i < s.length(); i++) w += width(styled(String.valueOf(s.charAt(i)), bold)) + 1;
 		return Math.max(0, w - 1);
 	}
 
@@ -31,7 +41,7 @@ public final class UiText {
 		for (int i = 0; i < s.length(); i++) {
 			Component c = styled(String.valueOf(s.charAt(i)), bold);
 			Render2D.text(g, font(), c, x, y, color, false);
-			x += font().width(c) + 1;
+			x += width(c) + 1;
 		}
 	}
 

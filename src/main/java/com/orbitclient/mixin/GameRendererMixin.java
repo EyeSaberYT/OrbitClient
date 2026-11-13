@@ -6,7 +6,7 @@ import com.orbitclient.module.visual.MotionBlurModule;
 import com.orbitclient.module.visual.NoHurtCamModule;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.sugar.Local;
-//? if >=1.21.6
+//? if >=1.21.2
 import com.mojang.blaze3d.resource.CrossFrameResourcePool;
 import net.minecraft.client.renderer.GameRenderer;
 import org.spongepowered.asm.mixin.Final;
@@ -51,7 +51,7 @@ public class GameRendererMixin {
 		if (NoHurtCamModule.active()) ci.cancel();
 	}
 
-	//? if >=1.21.6 {
+	//? if >=1.21.2 {
 	@Shadow
 	@Final
 	private CrossFrameResourcePool resourcePool;

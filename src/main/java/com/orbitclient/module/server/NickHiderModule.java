@@ -53,6 +53,7 @@ public class NickHiderModule extends Module {
 		}
 		if (!any) return component;
 		MutableComponent out = Component.empty();
+		//? if >=1.16 {
 		component.visit((style, part) -> {
 			String replaced = part.replace(own, instance.nick.get());
 			if (others) {
@@ -64,6 +65,19 @@ public class NickHiderModule extends Module {
 			out.append(Component.literal(replaced).withStyle(style));
 			return Optional.empty();
 		}, net.minecraft.network.chat.Style.EMPTY);
+		//?} else {
+		/*// Before 1.16 a component is walked piece by piece.
+		for (Component piece : (Iterable<Component>) component.flatStream()::iterator) {
+			String replaced = piece.getContents().replace(own, instance.nick.get());
+			if (others) {
+				for (var info : mc.getConnection().getOnlinePlayers()) {
+					String name = info.getProfile().getName();
+					if (!name.equals(own) && name.length() > 2) replaced = replaced.replace(name, instance.othersNick.get());
+				}
+			}
+			out.append(new net.minecraft.network.chat.TextComponent(replaced).setStyle(piece.getStyle().copy()));
+		}
+		*///?}
 		return out;
 	}
 }

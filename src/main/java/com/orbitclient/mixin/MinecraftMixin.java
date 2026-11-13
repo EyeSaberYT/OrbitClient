@@ -21,9 +21,11 @@ public class MinecraftMixin {
 	}
 	//?}
 
-	/** Team View: teammates glow in their team color. */
+	/** Team View: teammates glow in their team color. (Before 1.16: EntityMixin.) */
+	//? if >=1.16 {
 	@ModifyReturnValue(method = "shouldEntityAppearGlowing", at = @At("RETURN"))
 	private boolean orbit$teamGlow(boolean glowing, @Local(argsOnly = true) Entity entity) {
 		return glowing || TeamViewModule.glows(entity);
 	}
+	//?}
 }

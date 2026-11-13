@@ -521,9 +521,9 @@ public class CrosshairEditorScreen extends Screen {
 			return true;
 		}
 		int[] c = cellAt(mx, my);
-		if (c != null && (button == 0 || button == 1)) {
+		if (c != null && (button == GLFW.GLFW_MOUSE_BUTTON_LEFT || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT)) {
 			pushUndo();
-			painting = button == 0 ? 1 : 0;
+			painting = button == GLFW.GLFW_MOUSE_BUTTON_LEFT ? 1 : 0;
 			lastCellX = lastCellY = -1;
 			paintTo(c[0], c[1]);
 			return true;
@@ -532,7 +532,7 @@ public class CrosshairEditorScreen extends Screen {
 			if (module.mode.is("Simple") && simpleList.mouseClicked(mx, my, button)) return true;
 			if (colorList.mouseClicked(mx, my, button)) return true;
 		}
-		if (button == 0) {
+		if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
 			for (int i = hits.size() - 1; i >= 0; i--) {
 				Hit h = hits.get(i);
 				boolean headerHit = h.y < contentTop();

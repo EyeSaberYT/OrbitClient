@@ -66,6 +66,8 @@ public final class CosmeticManager {
 	}
 
 	private static final Loadout OWN = new Loadout();
+	/** Which account OWN belongs to, and the other accounts' outfits on this client. */
+	private static final AccountOutfits OUTFITS = new AccountOutfits();
 	private static volatile Set<String> OWNED = Set.of();
 	private static volatile boolean ownershipLoaded;
 	private static final Map<UUID, Loadout> OTHERS = new ConcurrentHashMap<>();
@@ -92,13 +94,36 @@ public final class CosmeticManager {
 		return ownershipLoaded;
 	}
 
-	/** Install the server-authoritative item ids and immediately clear any now-unowned outfit entries. */
-	public static synchronized void setOwned(Set<String> ids) {
+	/**
+	 * Install the server-authoritative item ids for {@code account} and clear any now-unowned outfit
+	 * entries. Ignored unless {@code account} is the account the outfit belongs to: a late answer for
+	 * an account you've since switched away from must not touch this one.
+	 */
+	public static synchronized void setOwned(UUID account, Set<String> ids) {
+		if (account == null || !account.equals(OUTFITS.owner())) return;
 		OWNED = Set.copyOf(new HashSet<>(ids));
 		ownershipLoaded = true;
 		boolean changed = OWN.worn.entrySet().removeIf(entry -> !OWNED.contains(entry.getValue().id()));
 		if (preview != null && !OWNED.contains(preview.id)) preview = null;
 		if (changed) onChange.run();
+	}
+
+	/**
+	 * The signed-in account is {@code account}. On a change, the previous account's outfit is put aside
+	 * and this account's comes back, and ownership becomes unknown (nothing wearable, nothing taken off)
+	 * until the server answers for this account.
+	 */
+	public static synchronized void useAccount(UUID account) {
+		if (account == null || account.equals(OUTFITS.owner())) return;
+		boolean adopting = OUTFITS.owner() == null;
+		Loadout next = Loadout.fromJson(OUTFITS.switchTo(account, OWN.toJson()));
+		OWN.worn.clear();
+		OWN.worn.putAll(next.worn);
+		OWNED = Set.of();
+		ownershipLoaded = false;
+		preview = null;
+		// Keep the put-aside outfit across restarts. (Adopting an older config changes nothing on disk yet.)
+		if (!adopting) com.orbitclient.config.ConfigManager.save();
 	}
 
 	/** Called whenever your loadout changes (the sync uploads it). */
@@ -160,12 +185,12 @@ public final class CosmeticManager {
 		return c == null ? 0 : c.nameLift;
 	}
 
-	public static JsonObject save() {
-		return OWN.toJson();
+	public static synchronized JsonObject save() {
+		return OUTFITS.save(OWN.toJson());
 	}
 
-	public static void load(JsonElement json) {
-		Loadout l = Loadout.fromJson(json);
+	public static synchronized void load(JsonElement json) {
+		Loadout l = Loadout.fromJson(OUTFITS.load(json));
 		OWN.worn.clear();
 		OWN.worn.putAll(l.worn);
 	}

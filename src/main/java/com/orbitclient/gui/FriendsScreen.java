@@ -101,6 +101,7 @@ public final class FriendsScreen extends net.minecraft.client.gui.screens.Screen
 		b.setMaxLength(maxLength);
 		b.setBordered(false);
 		b.setTextColor(0xFFFFFFFF);
+		//? if >=1.19.3
 		b.setHint(Component.literal(hint).withStyle(s -> s.withColor(Theme.O_TEXT_FAINT)));
 		return addRenderableWidget(b);
 	}
@@ -138,8 +139,10 @@ public final class FriendsScreen extends net.minecraft.client.gui.screens.Screen
 		Friends.openChat = friend == null ? null : friend.uuid();
 		if (friend != null) Friends.markRead(friend.uuid());
 		chatBox.visible = friend != null;
+		//? if >=1.19.3 {
 		chatBox.setHint(Component.literal(friend == null ? "" : "Message " + name(friend.uuid(), friend.name()) + "...")
 			.withStyle(s -> s.withColor(Theme.O_TEXT_FAINT)));
+		//?}
 
 		Render2D.alpha = Anim.easeOutCubic(openProgress);
 		try {
@@ -482,7 +485,7 @@ public final class FriendsScreen extends net.minecraft.client.gui.screens.Screen
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		if (event.button() == 0) {
+		if (event.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
 			for (Hit h : hits) {
 				if (Render2D.hovered(event.x(), event.y(), h.x, h.y, h.w, h.h)) {
 					minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1f));

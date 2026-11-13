@@ -16,7 +16,16 @@ public record PlayerSkin(Identifier texture, Identifier capeTexture) {
 
 	/^* A profile's skin, the default one until Mojang's has loaded (asked again on every get). ^/
 	public static Supplier<PlayerSkin> lookup(GameProfile profile) {
+		//? if >=1.19.1 {
 		return () -> new PlayerSkin(Minecraft.getInstance().getSkinManager().getInsecureSkinLocation(profile), null);
+		//?} else {
+		/^return () -> {
+			var skins = Minecraft.getInstance().getSkinManager();
+			var skin = skins.getInsecureSkinInformation(profile).get(com.mojang.authlib.minecraft.MinecraftProfileTexture.Type.SKIN);
+			return new PlayerSkin(skin != null ? skins.registerTexture(skin, com.mojang.authlib.minecraft.MinecraftProfileTexture.Type.SKIN)
+				: net.minecraft.client.resources.DefaultPlayerSkin.getDefaultSkin(), null);
+		};
+		^///?}
 	}
 }
 *///?}

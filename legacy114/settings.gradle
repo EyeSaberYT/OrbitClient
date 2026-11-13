@@ -1,0 +1,15 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+// Orbit Client for Minecraft 1.14 to 1.14.4. These versions draw the old way (like 1.13) but run on modern
+// Fabric, whose mappings name the game's classes differently from Legacy Fabric's. So this is the legacy
+// client (../legacy) again: the same shared code, with the game-facing part written in these names.
+rootProject.name = 'orbit-client-legacy114'

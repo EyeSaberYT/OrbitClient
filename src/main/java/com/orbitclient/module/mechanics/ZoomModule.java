@@ -42,7 +42,8 @@ public class ZoomModule extends Module {
 	}
 
 	public static boolean isZooming() {
-		return instance != null && instance.isEnabled() && mc.screen == null && OrbitClient.zoomKey.isDown();
+		// In a world only: this is also asked while the game starts, before there are any screens (26.3).
+		return instance != null && instance.isEnabled() && mc.player != null && mc.screen == null && OrbitClient.zoomKey.isDown();
 	}
 
 	@Override

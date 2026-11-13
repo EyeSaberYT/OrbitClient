@@ -42,6 +42,8 @@ public class ScreenshotModule extends Module {
 		instance = this;
 		copy = add(new BooleanSetting("Copy to Clipboard", true));
 		buttons = add(new BooleanSetting("Chat Buttons", true));
+		// (Fabric API has no client commands before 1.16.2: there, the chat button can't copy.)
+		//? if >=1.16.2 {
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registries) -> dispatcher.register(
 			ClientCommandManager.literal(COMMAND).then(ClientCommandManager.literal("copy")
 				.then(ClientCommandManager.argument("file", StringArgumentType.greedyString()).executes(ctx -> {
@@ -51,6 +53,7 @@ public class ScreenshotModule extends Module {
 						.withStyle(ok ? ChatFormatting.GREEN : ChatFormatting.RED));
 					return ok ? 1 : 0;
 				})))));
+		//?}
 	}
 
 	/** A screenshot by file name, only from this game's screenshots folder; null if it isn't one. */

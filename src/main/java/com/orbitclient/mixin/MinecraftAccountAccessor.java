@@ -1,12 +1,17 @@
 package com.orbitclient.mixin;
 
+//? if >=1.18
 import com.mojang.authlib.minecraft.UserApiService;
 import com.mojang.authlib.yggdrasil.ProfileResult;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
+//? if >=1.16.4
 import net.minecraft.client.gui.screens.social.PlayerSocialManager;
+//? if >=1.19
 import net.minecraft.client.multiplayer.ProfileKeyPairManager;
+//? if >=1.19.1
 import net.minecraft.client.multiplayer.chat.report.ReportingContext;
+//? if >=1.19.3
 import net.minecraft.client.telemetry.ClientTelemetryManager;
 //? if >=1.21.9
 import net.minecraft.server.Services;
@@ -42,6 +47,7 @@ public interface MinecraftAccountAccessor {
 	@Accessor("profileFuture")
 	void orbit$setProfileFuture(CompletableFuture<ProfileResult> profile);
 
+	//? if >=1.18 {
 	@Mutable
 	@Accessor("userApiService")
 	void orbit$setUserApiService(UserApiService service);
@@ -49,20 +55,29 @@ public interface MinecraftAccountAccessor {
 	@Mutable
 	@Accessor("userPropertiesFuture")
 	void orbit$setUserPropertiesFuture(CompletableFuture<UserApiService.UserProperties> properties);
+	//?}
 
+	//? if >=1.16.4 {
 	@Mutable
 	@Accessor("playerSocialManager")
 	void orbit$setPlayerSocialManager(PlayerSocialManager manager);
+	//?}
 
+	//? if >=1.19.3 {
 	@Mutable
 	@Accessor("telemetryManager")
 	void orbit$setTelemetryManager(ClientTelemetryManager manager);
+	//?}
 
+	//? if >=1.19 {
 	@Mutable
 	@Accessor("profileKeyPairManager")
 	void orbit$setProfileKeyPairManager(ProfileKeyPairManager manager);
+	//?}
 
+	//? if >=1.19.1 {
 	@Mutable
 	@Accessor("reportingContext")
 	void orbit$setReportingContext(ReportingContext context);
+	//?}
 }

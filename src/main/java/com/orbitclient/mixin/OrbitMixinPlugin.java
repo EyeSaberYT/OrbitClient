@@ -24,13 +24,37 @@ public class OrbitMixinPlugin implements IMixinConfigPlugin {
 		//? if >=1.20.5 <1.21.6 {
 		/*mixins.add("GuiHudMixin");
 		*///?}
-		//? if <1.20.5 {
+		//? if >=1.20 <1.20.5 {
 		/*mixins.add("GuiHudLegacyMixin");
+		*///?}
+		//? if >=1.16 <1.20 {
+		/*mixins.add("GuiHudOldMixin");
+		*///?}
+		//? if <1.16 {
+		/*mixins.add("GuiHud115Mixin");
+		*///?}
+		//? if >=1.21.6 {
+		mixins.add("FontMixin");
+		//?}
+		//? if >=1.15.2 {
+		mixins.add("WindowTitleMixin");
+		//?}
+		//? if <1.16.1 {
+		/*mixins.add("PlayerRendererLayerMixin");
+		mixins.add("OwnEventsMixin");
+		mixins.add("OwnEventsItemMixin");
+		*///?}
+		//? if >=1.19 {
+		mixins.add("OptionInstanceMixin");
+		//?} else {
+		/*mixins.add("LightTextureGammaMixin");
+		mixins.add("MouseSensitivityMixin");
 		*///?}
 		//? if <1.21.6 {
 		/*mixins.add("BossHealthOverlayMixin");
 		*///?}
-		//? if <1.20.2 {
+		// Before 1.19.3 there's no renderWithTooltip to hook: Orbit's screens draw their background themselves.
+		//? if >=1.19.3 <1.20.2 {
 		/*mixins.add("ScreenBackgroundMixin");
 		*///?}
 		//? if >=1.21.5 <1.21.6 {

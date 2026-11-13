@@ -81,6 +81,8 @@ public class WardrobeScreen extends Screen {
 
 	public WardrobeScreen() {
 		super(Component.literal("Wardrobe"));
+		// Cosmetics redeemed on the website since the last check show up as soon as the wardrobe opens.
+		CosmeticSync.requestRefresh();
 	}
 
 	@Override
@@ -428,7 +430,7 @@ public class WardrobeScreen extends Screen {
 
 			if (!CosmeticManager.owns(focus.id)) {
 				String message = CosmeticManager.ownershipLoaded()
-					? "Claim this free cosmetic at orbit.minearcade.org/shop. Claims are account-bound; nothing equips automatically."
+					? "Get this free cosmetic at orbit.minearcade.org/cosmetics, then press Refresh. It's added to your account; nothing equips automatically."
 					: "Checking your account's claims… Connect to the cosmetics server to unlock claimed items.";
 				List<String> lines = UiText.wrap(message, w - 24, 5);
 				for (int i = 0; i < lines.size(); i++) UiText.text(g, lines.get(i), x + 12, top + 108 + i * 10, Theme.O_TEXT_DIM);
@@ -446,7 +448,14 @@ public class WardrobeScreen extends Screen {
 			if (isWorn && focus.colorable) renderColors(g, mx, my, x, by + 24, w, focus);
 			}
 		}
-		List<String> status = UiText.wrap(CosmeticSync.status(), w - 24, 2);
+		// Refresh claims (website redemptions appear without a restart); F5 does the same.
+		boolean checking = CosmeticSync.checkingClaims();
+		int rw = 50, rh = 12, rx = x + w - 12 - rw, ry = y + h - 23;
+		float rhv = anim("refresh", !checking && Render2D.hovered(mx, my, rx, ry, rw, rh), 16f);
+		Render2D.roundedRect(g, rx, ry, rw, rh, 6, Render2D.lerpColor(0xFF2A2D36, 0xFF3A3E4A, rhv));
+		UiText.spacedSmall(g, checking ? "CHECKING" : "REFRESH", rx + rw / 2f, ry + 3, checking ? Theme.O_TEXT_DIM : 0xFFFFFFFF, true, 0.6f);
+		if (!checking) hits.add(new Hit(rx, ry, rw, rh, CosmeticSync::requestRefresh));
+		List<String> status = UiText.wrap(CosmeticSync.status(), w - 30 - rw, 2);
 		for (int i = 0; i < status.size(); i++) UiText.text(g, status.get(i), x + 12, y + h - 12 - (status.size() - i) * 10, Theme.O_TEXT_FAINT);
 		renderOutfit(g, mx, my, x, y + h - 16 - status.size() * 10 - OUTFIT_H, w);
 	}
@@ -532,7 +541,7 @@ public class WardrobeScreen extends Screen {
 		if (closing) return true;
 		double mx = event.x(), my = event.y();
 		if (colorSetting != null && colorList.mouseClicked(mx, my, event.button())) return true;
-		if (event.button() != 0) return super.mouseClicked(event, doubleClick);
+		if (event.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return super.mouseClicked(event, doubleClick);
 		for (int i = hits.size() - 1; i >= 0; i--) {
 			Hit h = hits.get(i);
 			if (Render2D.hovered(mx, my, h.x, h.y, h.w, h.h)) {
@@ -609,6 +618,10 @@ public class WardrobeScreen extends Screen {
 		}
 		if (key == GLFW.GLFW_KEY_BACKSPACE) {
 			if (!search.isEmpty()) search = search.substring(0, search.length() - 1);
+			return true;
+		}
+		if (key == GLFW.GLFW_KEY_F5) {
+			CosmeticSync.requestRefresh();
 			return true;
 		}
 		if (key == GLFW.GLFW_KEY_UP || key == GLFW.GLFW_KEY_DOWN) {

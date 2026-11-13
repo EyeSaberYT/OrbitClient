@@ -68,6 +68,22 @@ public class PerformanceTest implements FabricClientGameTest {
 			compare(context, "Nametags and HUD (F1)", mc -> mc.options.hideGui = true, mc -> mc.options.hideGui = false);
 			compare(context, "Nametags and HUD again", mc -> mc.options.hideGui = true, mc -> mc.options.hideGui = false);
 			compare(context, "Orbit's HUD mods, players", mc -> hud.forEach(m -> m.setEnabled(false)), mc -> hud.forEach(m -> m.setEnabled(true)));
+			// The same players, each wearing a full outfit (hat, face, back, wings, aura and pet).
+			compare(context, "Cosmetics on " + PLAYERS + " players", mc -> showCosmetics(mc, false), mc -> showCosmetics(mc, true));
+			compare(context, "Cosmetics, again", mc -> showCosmetics(mc, false), mc -> showCosmetics(mc, true));
+			// How much geometry that is: models and faces drawn per frame with everyone dressed.
+			context.runOnClient(mc -> showCosmetics(mc, true));
+			context.waitTicks(20);
+			long[] before = context.computeOnClient(mc -> new long[] {com.orbitclient.cosmetics.VoxelModel.drawnModels, com.orbitclient.cosmetics.VoxelModel.drawnFaces});
+			double frames = 0;
+			for (int second = 0; second < 5; second++) {
+				context.waitTicks(20);
+				frames += context.computeOnClient(mc -> mc.getFps());
+			}
+			long[] after = context.computeOnClient(mc -> new long[] {com.orbitclient.cosmetics.VoxelModel.drawnModels, com.orbitclient.cosmetics.VoxelModel.drawnFaces});
+			System.out.printf(java.util.Locale.ROOT, "[PERF] Cosmetics per frame: %.0f models, %.0f faces (%.0f per player)%n",
+				(after[0] - before[0]) / frames, (after[1] - before[1]) / frames, (after[1] - before[1]) / frames / PLAYERS);
+			context.runOnClient(mc -> showCosmetics(mc, false));
 
 			// Holograms like a server lobby's: text displays with a few colored lines each.
 			for (int i = 0; i < HOLOGRAMS; i++) {
@@ -250,6 +266,18 @@ public class PerformanceTest implements FabricClientGameTest {
 	}
 
 	/** Other players in a block in front of the camera, like a lobby. */
+	private static final String OUTFIT = "{\"HAT\":{\"id\":\"crown\",\"color\":-868018},\"FACE\":{\"id\":\"bandana\",\"color\":-2734787},"
+		+ "\"BACK\":{\"id\":\"backpack\",\"color\":-11634113},\"WINGS\":{\"id\":\"dragon_wings\",\"color\":-8773845},"
+		+ "\"AURA\":{\"id\":\"orbit\",\"color\":-8622849},\"PET\":{\"id\":\"wisp\",\"color\":-8590000}}";
+
+	/** Dresses every other player (or undresses them). Done again each time: the real sync may clear made-up players. */
+	private static void showCosmetics(Minecraft mc, boolean on) {
+		var outfit = on ? com.orbitclient.cosmetics.CosmeticManager.Loadout.fromJson(com.google.gson.JsonParser.parseString(OUTFIT)) : null;
+		for (var player : mc.level.players()) {
+			if (player != mc.player) com.orbitclient.cosmetics.CosmeticManager.setOther(player.getUUID(), outfit);
+		}
+	}
+
 	private static void addPlayers(Minecraft mc) {
 		var me = mc.player;
 		float yaw = (float) Math.toRadians(me.getYRot());

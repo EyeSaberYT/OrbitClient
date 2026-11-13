@@ -1,0 +1,99 @@
+plugins {
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+	id 'legacy-looming' version "${loom_version}" // must be the same as Loom's
+}
+
+// One source tree, one jar per old Minecraft version: `gradle build -Pmc=1.12.2` (1.8.9 when not given).
+// Each version builds and runs in its own folder (build/<version>, run/<version>).
+def mc = (project.findProperty('mc') ?: project.minecraft_version).toString()
+def supported = ['1.8.2', '1.8.3', '1.8.4', '1.8.5', '1.8.6', '1.8.7', '1.8.8', '1.8.9',
+	'1.9.4', '1.10.2', '1.11.2', '1.12.2', '1.13.2']
+// (1.8 and 1.8.1 are not here: they still have the older drawing code, like 1.7.)
+// The 1.8 point releases from 1.8.2 have the same game code as far as this client is concerned: they share 1.8.9's
+// compatibility class.
+def compatVersion = mc.startsWith('1.8') ? '1.8.9' : mc
+// Legacy yarn's newest build differs for a couple of versions.
+def yarnBuild = mc in ['1.8.6', '1.7.10'] ? '603' : project.yarn_build
+if (!(mc in supported)) throw new GradleException("Unsupported -Pmc=${mc}: one of ${supported}")
+layout.buildDirectory = file("build/${mc}")
+
+version = "${project.mod_version}+${mc}"
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${mc}"
+	mappings(legacy.yarn(mc, yarnBuild))
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+}
+
+// The cosmetic art (every hat, wing, pet, ...) and the ownership rules are the main client's own files:
+// copied in at build time with the few engine classes they name pointed at this client's stand-ins
+// (com.orbitclient.legacy.gl). Nothing here is a second copy to keep in step.
+def sharedCosmetics = ['Hats', 'Backs', 'Auras', 'Pets', 'Wings', 'Faces', 'Capes', 'Cosmetics', 'CosmeticSlot',
+	'VoxelModel', 'ClaimsResponse', 'AccountOutfits']
+def sharedDir = layout.buildDirectory.dir('generated/shared')
+def syncShared = tasks.register('syncShared', Copy) {
+	from('../src/main/java/com/orbitclient/cosmetics') {
+		include sharedCosmetics.collect { "${it}.java".toString() }
+	}
+	into sharedDir.map { it.dir('com/orbitclient/cosmetics') }
+	filter { String line ->
+		line.replace('import com.mojang.blaze3d.vertex.PoseStack;', 'import com.orbitclient.legacy.gl.PoseStack;')
+			.replace('import com.mojang.blaze3d.vertex.VertexConsumer;', 'import com.orbitclient.legacy.gl.VertexConsumer;')
+			.replace('import com.mojang.math.Axis;', 'import com.orbitclient.legacy.gl.Axis;')
+			.replace('import net.minecraft.world.phys.Vec3;', 'import com.orbitclient.legacy.gl.Vec3;')
+			.replace('import net.minecraft.client.renderer.texture.OverlayTexture;', 'import com.orbitclient.legacy.gl.OverlayTexture;')
+			// Minecraft 1.8.9 ships an old Gson without the static parser.
+			.replace('JsonParser.parseString(', 'new JsonParser().parse(')
+	}
+}
+sourceSets.main.java.srcDir(sharedDir)
+// The few calls that differ between the old versions (Compat) come from a folder per version.
+sourceSets.main.java.srcDir("src/v${compatVersion}/java")
+// src/main is written without the game's own class names where they differ between mappings; the code that
+// needs them (drawing, the player layer, the hooks, and Game, which the rest calls) is in src/names-legacy.
+// The 1.14 build (../legacy114) uses src/main with its own names folder.
+sourceSets.main.java.srcDir('src/names-legacy/java')
+// What differs between engine generations (input, textures, the screen class) comes from a folder per
+// generation: LWJGL 2 up to 1.12.2, LWJGL 3 for 1.13.2.
+def generation = mc == '1.13.2' ? 'lwjgl3' : 'lwjgl2'
+sourceSets.main.java.srcDir("src/gen-${generation}/java")
+tasks.named('compileJava') { dependsOn syncShared }
+tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn syncShared }
+
+// The cosmetics are written with records and newer library calls, so this client needs Java 17
+// (Orbit Launcher starts instances that have Orbit Client on Java 17).
+def javaVersion = 17
+
+processResources {
+	def props = [version: project.version, minecraft: mc, java: javaVersion,
+		generationMixins: generation == 'lwjgl2' ? '"ResourcePackMixin",\n\t\t' : '']
+	inputs.properties props
+	filesMatching(['fabric.mod.json', 'orbitclient.mixins.json']) {
+		expand props
+	}
+	// The cosmetic textures (capes and the white voxel texture) are the main client's.
+	from('../src/main/resources') {
+		include 'assets/orbitclient/textures/cosmetics/**'
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.encoding = 'UTF-8'
+	it.options.release = javaVersion
+}
+
+loom.runs.configureEach { runDir "run/${mc}" }
+
+// `gradlew runClient -PstartAudit` starts the game, waits for the first menu and quits (see StartAudit).
+if (project.hasProperty('startAudit')) {
+	loom.runs.client.vmArg '-Dorbit.startAudit=true'
+}
+// `gradlew runClient -PshotAudit` also opens a test world, dresses the player and saves screenshots.
+if (project.hasProperty('shotAudit')) {
+	loom.runs.client.vmArg '-Dorbit.shotAudit=true'
+}

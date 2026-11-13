@@ -18,4 +18,13 @@ public class EntityMixin {
 			ci.cancel();
 		}
 	}
+
+	//? if <1.16 {
+	/*// Team View before 1.16 (see MinecraftMixin): the game asks the entity itself whether it glows.
+	@com.llamalad7.mixinextras.injector.ModifyReturnValue(method = "isGlowing", at = @At("RETURN"))
+	private boolean orbit$teamGlow(boolean glowing) {
+		Entity self = (Entity) (Object) this;
+		return glowing || (self.level.isClientSide && com.orbitclient.module.visual.TeamViewModule.glows(self));
+	}
+	*///?}
 }

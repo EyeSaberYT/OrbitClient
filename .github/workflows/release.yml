@@ -15,39 +15,66 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Fabric Loom 1.19 runs on Java 25 (so does Minecraft 26.x); older versions' jars target Java 21 or 17.
+      # Fabric Loom 1.19 runs on Java 25 (so does Minecraft 26.x); older versions' jars target Java 21, 17 or 8.
+      # The Legacy Fabric projects (1.8 to 1.14) build on Java 21. The last version listed is the default.
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 25
+          java-version: |
+            21
+            25
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build
+      - name: Build 1.15 to 26.3
         run: |
           chmod +x gradlew
-          ./gradlew build -Pmod_version="${GITHUB_REF_NAME#v}" --no-daemon
+          ./gradlew build -Pmod_version="${GITHUB_REF_NAME#v}" --no-daemon --max-workers=3
+      # Separate projects, one Minecraft version per run. A version that fails to build is left out of the
+      # release instead of holding back the others.
+      - name: Build 1.8.2 to 1.13.2 (Legacy Fabric)
+        continue-on-error: true
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          for mc in 1.8.2 1.8.3 1.8.4 1.8.5 1.8.6 1.8.7 1.8.8 1.8.9 1.9.4 1.10.2 1.11.2 1.12.2 1.13.2; do
+            ./gradlew -p legacy build -Pmc="$mc" -Pmod_version="${GITHUB_REF_NAME#v}" --no-daemon || echo "::warning::Orbit Client for $mc did not build"
+          done
+      - name: Build 1.14 to 1.14.4
+        continue-on-error: true
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+        run: |
+          for mc in 1.14 1.14.1 1.14.2 1.14.3 1.14.4; do
+            ./gradlew -p legacy114 build -Pmc="$mc" -Pmod_version="${GITHUB_REF_NAME#v}" --no-daemon || echo "::warning::Orbit Client for $mc did not build"
+          done
       - uses: softprops/action-gh-release@v2
         with:
           name: Orbit Client ${{ github.ref_name }}
           files: |
             versions/*/build/libs/orbit-client-*.jar
-            !versions/*/build/libs/*-sources.jar
+            legacy/build/*/libs/orbit-client-*.jar
+            legacy114/build/*/libs/orbit-client-*.jar
+            !**/*-sources.jar
           body: |
-            Orbit Client for Fabric: one jar per Minecraft version (orbit-client-<version>+<Minecraft version>.jar), for
-            1.20, 1.20.1, 1.20.2, 1.20.3, 1.20.4, 1.20.5, 1.20.6, 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6,
-            1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1, 26.1.1, 26.1.2, 26.2 and 26.3. Needs Fabric API.
+            Orbit Client for Fabric: one jar per Minecraft version (orbit-client-<version>+<Minecraft version>.jar).
             Orbit Launcher installs and updates it automatically, picking the jar for each instance's Minecraft version.
 
-            Changes in 1.1.3:
-            - Motion Blur draws the screen twice per frame instead of three times (about a third less of its cost).
-            - Motion Blur is only offered from 1.21.6: older versions can't keep an image between frames, so it never worked there.
-            - Everything from 1.20 to 26.3 in one release: the first versions older than 1.21.9 in this line.
+            - 1.15 to 26.3, every release: the full client. Needs Fabric API.
+            - 1.14 to 1.14.4, and 1.8.2 to 1.8.9, 1.9.4, 1.10.2, 1.11.2, 1.12.2 and 1.13.2 (Legacy Fabric): cosmetics
+              and the wardrobe only. These need Java 17 or newer, which Orbit Launcher picks by itself.
 
-            Not yet in this release (still being ported): 1.16.5, 1.17.1, 1.18.1, 1.18.2, 1.19 to 1.19.4, and the
-            Legacy Fabric versions 1.8.9 and 1.12.2. Their old releases are still available.
+            Changes in 1.1.4:
+            - Fixed: nothing could be clicked on Minecraft 26.3. That version numbers the mouse buttons differently,
+              and Orbit's screens ignored every left click.
+            - Fixed: options failed to save while 26.3 started.
+            - Many more Minecraft versions: everything from 1.15 to 1.19.4 joins 1.20 to 26.3, and the cosmetics
+              builds for 1.8 to 1.14 are part of the release.
+            - Cosmetics draw about three times faster: flat areas of a model are drawn as one face instead of one
+              per voxel.
 
             Known limits by version:
-            - 1.20 to 1.20.2, and 26.2 and 26.3: switching accounts in game points you to Orbit Launcher (in-game
+            - 1.20.2 and older, and 26.2 and 26.3: switching accounts in game points you to Orbit Launcher (in-game
               switching works on 1.20.3 to 26.1).
             - 1.20.4 and older: no menu blur, no Motion Blur, titles can't scale or hide, the tab list doesn't fold,
               and Item Physics draws one item per stack.
             - 1.21.5 and older: no Motion Blur, the text layout cache is off, and the crosshair's blend isn't inverted.
+            - There is no mod loader for 1.9 to 1.9.3, 1.10, 1.10.1, 1.11, 1.11.1, 1.12, 1.12.1, 1.13 and 1.13.1.

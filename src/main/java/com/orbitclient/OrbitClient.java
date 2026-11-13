@@ -53,6 +53,8 @@ public class OrbitClient implements ClientModInitializer {
 		ConfigManager.load();
 		HudRenderer.register();
 		// Cosmetics on every player model (the cape is handled by the cape layer).
+		// (Before 1.16.1 Fabric API has no such callback: PlayerRendererLayerMixin adds the layer.)
+		//? if >=1.16.1 {
 		net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback.EVENT.register((type, renderer, helper, context) -> {
 			//? if >=1.21.9 {
 			if (renderer instanceof net.minecraft.client.renderer.entity.player.AvatarRenderer<?> avatar) {
@@ -66,6 +68,7 @@ public class OrbitClient implements ClientModInitializer {
 				helper.register(new com.orbitclient.cosmetics.CosmeticsLayer(parent));
 			}
 		});
+		//?}
 		com.orbitclient.cosmetics.CosmeticSync.init();
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			com.orbitclient.cosmetics.CosmeticManager.tickTrails();

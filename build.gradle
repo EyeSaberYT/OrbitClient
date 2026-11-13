@@ -6,7 +6,10 @@ plugins {
 def mc = stonecutter.current.version
 def unobfuscated = stonecutter.current.parsed.matches('>=26.1')
 def fabricApiByVersion = [
-	'1.16.5': '0.42.0+1.16', '1.17.1': '0.46.1+1.17',
+	'1.14.4': '0.28.5+1.14', '1.15': '0.28.5+1.15', '1.15.1': '0.28.5+1.15', '1.15.2': '0.28.5+1.15',
+	'1.16': '0.13.1+build.370-1.16', '1.16.1': '0.18.0+build.387-1.16.1',
+	'1.16.2': '0.42.0+1.16', '1.16.3': '0.42.0+1.16', '1.16.4': '0.42.0+1.16',
+	'1.16.5': '0.42.0+1.16', '1.17': '0.36.0+1.17', '1.17.1': '0.46.1+1.17', '1.18': '0.46.1+1.18',
 	'1.18.1': '0.46.6+1.18', '1.18.2': '0.77.0+1.18.2', '1.19': '0.58.0+1.19', '1.19.1': '0.58.5+1.19.1',
 	'1.19.2': '0.77.0+1.19.2', '1.19.3': '0.76.1+1.19.3',
 	'1.19.4': '0.87.2+1.19.4', '1.20': '0.83.0+1.20', '1.20.1': '0.92.12+1.20.1',
@@ -135,6 +138,7 @@ tasks.register('exportCosmetics', JavaExec) {
 		['GLFW.GLFW_KEY_RIGHT', 'com.mojang.blaze3d.platform.InputConstants.KEY_RIGHT'],
 		['GLFW.GLFW_KEY_UP', 'com.mojang.blaze3d.platform.InputConstants.KEY_UP'],
 		['GLFW.GLFW_KEY_DOWN', 'com.mojang.blaze3d.platform.InputConstants.KEY_DOWN'],
+		['GLFW.GLFW_KEY_F5', 'com.mojang.blaze3d.platform.InputConstants.KEY_F5'],
 		['GLFW.GLFW_KEY_P', 'com.mojang.blaze3d.platform.InputConstants.KEY_P'],
 		['GLFW.GLFW_KEY_V', 'com.mojang.blaze3d.platform.InputConstants.KEY_V'],
 		['GLFW.GLFW_KEY_Z', 'com.mojang.blaze3d.platform.InputConstants.KEY_Z'],
@@ -425,6 +429,189 @@ tasks.register('exportCosmetics', JavaExec) {
 			'public boolean mouseScrolled(double mx, double my, double sy) {\n\t\tdouble sx = 0;'],
 		['super.mouseScrolled(mx, my, sx, sy)', 'super.mouseScrolled(mx, my, sy)'],
 	])
+	// Before 1.20: no GuiGraphics. Orbit's own (com.orbitclient.compat.GuiGraphics) wraps the PoseStack that
+	// render methods and mixins were handed instead.
+	oneWay(v.matches('<1.20'), [
+		['import net.minecraft.client.gui.GuiGraphics;', 'import com.orbitclient.compat.GuiGraphics;'],
+		['public void render(GuiGraphics g, int mx, int my, float delta) {', 'public void render(com.mojang.blaze3d.vertex.PoseStack orbit$pose, int mx, int my, float delta) {\n\t\tGuiGraphics g = GuiGraphics.of(orbit$pose);'],
+		['super.render(g, mx, my, delta);', 'super.render(g.pose(), mx, my, delta);'],
+		['super.renderBackground(g, mx, my, delta)', 'super.renderBackground(g.pose())'],
+		['tabList.render(graphics, w, scoreboard, objective);', 'tabList.render(graphics.pose(), w, scoreboard, objective);'],
+		['net.minecraft.client.gui.screens.inventory.InventoryScreen.renderEntityInInventory(g, ', 'com.orbitclient.compat.InventoryEntity.render(g.poseStack(), '],
+		['address, ServerData.Type.OTHER), false, null);', 'address, false));'],
+		['entity.level()', 'entity.level'],
+	])
+	// Before 1.19.4: no credits menu, walk animation as fields, no infinite effects, and the older item-transform name.
+	oneWay(v.matches('<1.19.4'), [
+		['import net.minecraft.client.gui.screens.CreditsAndAttributionScreen;', 'import net.minecraft.client.gui.screens.WinScreen;'],
+		['new CreditsAndAttributionScreen(this)', 'new WinScreen(false, () -> minecraft.setScreen(this))'],
+		['player.walkAnimation.position(partialTick)', 'player.animationPosition - player.animationSpeed * (1f - partialTick)'],
+		['player.walkAnimation.speed(partialTick)', 'Mth.lerp(partialTick, player.animationSpeedOld, player.animationSpeed)'],
+		['effect.isInfiniteDuration()', 'false'],
+		['net.minecraft.world.item.ItemDisplayContext.GROUND', 'net.minecraft.client.renderer.block.model.ItemTransforms.TransformType.GROUND'],
+		['Math.sqrt(box.distanceToSqr(eyes))', 'Math.sqrt(Math.pow(Math.max(Math.max(box.minX - eyes.x, eyes.x - box.maxX), 0), 2) + Math.pow(Math.max(Math.max(box.minY - eyes.y, eyes.y - box.maxY), 0), 2) + Math.pow(Math.max(Math.max(box.minZ - eyes.z, eyes.z - box.maxZ), 0), 2))'],
+	])
+	// Before 1.19.3: Mojang's own math classes instead of JOML, no text-box hints, registries on Registry, and
+	// chat sent through the player.
+	oneWay(v.matches('<1.19.3'), [
+		// No Screen.renderWithTooltip for ScreenBackgroundMixin: each Orbit screen starts with its background.
+		['public void render(GuiGraphics g, int mx, int my, float delta) {', 'public void render(com.mojang.blaze3d.vertex.PoseStack orbit$pose, int mx, int my, float delta) {\n\t\tGuiGraphics g = GuiGraphics.of(orbit$pose);\n\t\torbit$background(g, mx, my, delta);'],
+		['import com.mojang.math.Axis;', 'import com.orbitclient.compat.Axis;'],
+		['import org.joml.Quaternionf;', 'import com.mojang.math.Quaternion;'],
+		['import org.joml.Vector3f;', 'import com.mojang.math.Vector3f;'],
+		['Quaternionf pose = new Quaternionf().rotateZ((float) Math.PI);', 'Quaternion pose = Vector3f.ZP.rotation((float) Math.PI);'],
+		['Quaternionf camera = new Quaternionf().rotateX((float) Math.toRadians(-8));', 'Quaternion camera = Vector3f.XP.rotation((float) Math.toRadians(-8));'],
+		['connection.getListedOnlinePlayers()', 'connection.getOnlinePlayers()'],
+		['mc.getFps() + " FPS"', 'mc.fpsString.split(" ")[0] + " FPS"'],
+		['effect.getEffect().getRegisteredName()', 'net.minecraft.core.Registry.MOB_EFFECT.getKey(effect.getEffect()).toString()'],
+		['image.copyRect(piece, 16, 27, 0, 0, 9, 9, false, false);', 'for (int px = 0; px < 9; px++) for (int py = 0; py < 9; py++) piece.setPixelRGBA(px, py, image.getPixelRGBA(16 + px, 27 + py));'],
+		['mc.player.connection.sendCommand(text.substring(1));', '{ if (!mc.player.commandUnsigned(text.substring(1))) mc.player.commandSigned(text.substring(1), null); }'],
+		['mc.player.connection.sendChat(text);', 'mc.player.chatSigned(text, null);'],
+	])
+	// Before 1.19.1: chat messages with ids (no signatures or tags), no face or scissor helpers, no User.getProfileId.
+	oneWay(v.matches('<1.19.1'), [
+		['import net.minecraft.client.gui.components.PlayerFaceRenderer;', '// PlayerFaceRenderer is new in 1.19.1'],
+		['getUser().getProfileId()', 'getUser().getGameProfile().getId()'],
+		['chat.orbit$lineHeight()', '9'],
+		['@Invoker("refreshTrimmedMessages")', '@Invoker("rescaleChat")'],
+		['mc.player.connection.sendCommand(text.substring(1));', 'mc.player.command(text.substring(1));'],
+		['mc.player.connection.sendChat(text);', 'mc.player.chat(text);'],
+	])
+	// Before 1.19: text as TextComponent, java.util.Random, client commands v1, resources that throw when missing
+	// (com.orbitclient.compat.Resources), and chat and commands both sent as chat.
+	oneWay(v.matches('<1.19'), [
+		['Component.literal(', 'new net.minecraft.network.chat.TextComponent('],
+		['Component.empty()', 'new net.minecraft.network.chat.TextComponent("")'],
+		['import net.minecraft.util.RandomSource;', 'import java.util.Random;'],
+		['RandomSource random', 'Random random'],
+		['import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;', 'import net.fabricmc.fabric.api.client.command.v1.ClientCommandManager;'],
+		['import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;', '// Before 1.19 client commands register on ClientCommandManager.DISPATCHER'],
+		['ClientCommandRegistrationCallback.EVENT.register((dispatcher, registries) -> dispatcher.register(', 'java.util.List.of(ClientCommandManager.DISPATCHER.register('],
+		['mc.player.connection.sendCommand(text.substring(1));', 'mc.player.chat(text);'],
+		['mc.player.connection.sendChat(text);', 'mc.player.chat(text);'],
+		['mc.getResourceManager().getResource(', 'com.orbitclient.compat.Resources.find(mc.getResourceManager(), '],
+		['Minecraft.getInstance().getResourceManager().getResource(', 'com.orbitclient.compat.Resources.find(Minecraft.getInstance().getResourceManager(), '],
+		['setIcon(Items.RECOVERY_COMPASS);', 'setIcon(Items.CLOCK);'],
+		['minecraft.disconnect(new net.minecraft.client.gui.screens.GenericMessageScreen(Component.literal("Joining " + f.name())), false);',
+			'minecraft.clearLevel(new net.minecraft.client.gui.screens.GenericDirtMessageScreen(new net.minecraft.network.chat.TextComponent("Joining " + f.name())));'],
+	])
+	// Before 1.18.2: no registry Holder, and no periodic-notification toast id.
+	oneWay(v.matches('<1.18.2'), [
+		['import net.minecraft.core.Holder;', '// Holder is new in 1.18.2'],
+		['private static final SystemToast.SystemToastId TOAST = new SystemToast.SystemToastId(5000L);',
+			'private static final SystemToast.SystemToastIds TOAST = SystemToast.SystemToastIds.TUTORIAL_HINT;'],
+	])
+	// Before 1.18: an older Gson (no static JsonParser.parseString) and vertex colors as four numbers.
+	oneWay(v.matches('<1.18'), [
+		['JsonParser.parseString(', 'new JsonParser().parse('],
+		['.color(color).uv(', '.color(color >> 16 & 0xFF, color >> 8 & 0xFF, color & 0xFF, color >>> 24).uv('],
+	])
+	// Before 1.17: the fixed-function renderer (no shader state), log4j only, rotation and inventory as fields,
+	// no ItemStack.is(Item) (com.orbitclient.compat.Stacks), and the older connect and feature-renderer calls.
+	oneWay(v.matches('<1.17'), [
+		['import net.minecraft.client.multiplayer.resolver.ServerAddress;', 'import net.minecraft.client.multiplayer.ServerAddress;'],
+		['ConnectScreen.startConnecting(new TitleScreen(), minecraft, ServerAddress.parseString(address),', 'minecraft.setScreen(new ConnectScreen(new TitleScreen(), minecraft,'],
+		['address, ServerData.Type.OTHER), false, null);', 'address, false)));'],
+		['import org.slf4j.Logger;', 'import org.apache.logging.log4j.Logger;'],
+		['import org.slf4j.LoggerFactory;', 'import org.apache.logging.log4j.LogManager;'],
+		['LoggerFactory.getLogger(', 'LogManager.getLogger('],
+		['Mth.DEG_TO_RAD', '((float) Math.PI / 180f)'],
+		['new DustParticleOptions(color, ', 'new DustParticleOptions((color >> 16 & 0xFF) / 255f, (color >> 8 & 0xFF) / 255f, (color & 0xFF) / 255f, '],
+		['s.withColor(0x8C7BFF)', 's.withColor(net.minecraft.network.chat.TextColor.fromRgb(0x8C7BFF))'],
+		['s.withColor(0x3FD07A)', 's.withColor(net.minecraft.network.chat.TextColor.fromRgb(0x3FD07A))'],
+		['addRenderableWidget(', 'addButton('],
+		['player.getBlockX()', 'player.blockPosition().getX()'],
+		['player.getBlockY()', 'player.blockPosition().getY()'],
+		['player.getBlockZ()', 'player.blockPosition().getZ()'],
+		['player.getYRot()', 'player.yRot'],
+		['player.getXRot()', 'player.xRot'],
+		['player.setYRot(facing);', 'player.yRot = facing;'],
+		['player.setXRot(0);', 'player.xRot = 0;'],
+		['player.setYRot(yRot);', 'player.yRot = yRot;'],
+		['player.setXRot(xRot);', 'player.xRot = xRot;'],
+		['player.setYRot(yaw);', 'player.yRot = yaw;'],
+		['stack.is(', 'com.orbitclient.compat.Stacks.is(stack, '],
+		['player.getInventory()', 'player.inventory'],
+		['player.getInventory().getSelectedSlot()', 'player.inventory.selected'],
+		['setIcon(Items.BUNDLE);', 'setIcon(Items.CHEST);'],
+		['setIcon(Items.TINTED_GLASS);', 'setIcon(Items.GLASS);'],
+		['setIcon(Items.SPYGLASS);', 'setIcon(Items.COMPASS);'],
+		['itemRenderer.getModel(stack, entity.level(), null, entity.getId())', 'itemRenderer.getModel(stack, entity.level, null)'],
+		['InputConstants.KEY_RSHIFT', '344'],
+		['InputConstants.KEY_C, CATEGORY', '67, CATEGORY'],
+		['net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback.EVENT.register((type, renderer, helper, context) -> {', 'net.fabricmc.fabric.api.client.rendereregistry.v1.LivingEntityFeatureRendererRegistrationCallback.EVENT.register((type, renderer, helper) -> {'],
+		['player.getEyePosition()', 'player.getEyePosition(1f)'],
+	])
+	// Before 1.16.2: wrapped text as FormattedText, the camera mode as a number (com.orbitclient.compat.CameraType),
+	// and no client commands in Fabric API.
+	oneWay(v.matches('<1.16.2'), [
+		['import net.minecraft.util.FormattedCharSequence;', 'import net.minecraft.network.chat.FormattedText;'],
+		['FormattedCharSequence text', 'FormattedText text'],
+		['Map<FormattedCharSequence, Entry>', 'Map<FormattedText, Entry>'],
+		['FormattedCharSequence pendingText', 'FormattedText pendingText'],
+		['if (!text.accept((index, style, codepoint) -> !style.isObfuscated())) entry.prepared = null;', '// (The text cache is only used from 1.21.6.)'],
+		['import net.minecraft.client.CameraType;', 'import com.orbitclient.compat.CameraType;'],
+		['mc.options.getCameraType()', 'com.orbitclient.compat.CameraType.get(mc.options)'],
+		['minecraft.options.getCameraType()', 'com.orbitclient.compat.CameraType.get(minecraft.options)'],
+		['mc.options.setCameraType(', 'com.orbitclient.compat.CameraType.set(mc.options, '],
+		['import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;', '// Fabric API has no client commands before 1.16.2'],
+	])
+	// Before 1.16: menus and the HUD draw straight to OpenGL (no pose stack is handed around; see
+	// com.orbitclient.compat.GuiGraphics), and text is the older mutable Component with formatting codes.
+	oneWay(v.matches('<1.16'), [
+		['public void render(GuiGraphics g, int mx, int my, float delta) {', 'public void render(int mx, int my, float delta) {\n\t\tGuiGraphics g = GuiGraphics.legacy();\n\t\torbit$background(g, mx, my, delta);'],
+		['super.render(g, mx, my, delta);', 'super.render(mx, my, delta);'],
+		['super.renderBackground(g, mx, my, delta)', 'super.renderBackground()'],
+		['tabList.render(graphics, w, scoreboard, objective);', 'tabList.render(w, scoreboard, objective);'],
+		['new EditBox(font, x, y, w, 10, Component.literal(hint));', 'new EditBox(font, x, y, w, 10, hint);'],
+		['import net.minecraft.network.chat.MutableComponent;', '// MutableComponent is new in 1.16'],
+		['MutableComponent out', 'Component out'],
+		['MutableComponent result', 'Component result'],
+		['import net.minecraft.network.chat.FormattedText;', '// FormattedText is new in 1.16'],
+		['import net.minecraft.util.FormattedCharSequence;', '// (no wrapped-text type before 1.16)'],
+		['FormattedCharSequence text', 'Object text'],
+		['Map<FormattedCharSequence, Entry>', 'Map<Object, Entry>'],
+		['FormattedCharSequence pendingText', 'Object pendingText'],
+		['for (FormattedText line : font.getSplitter().splitLines(m.text(), bubbleMax - 12, Style.EMPTY)) lines.add(line.getString());', 'lines.addAll(font.split(m.text(), bubbleMax - 12));'],
+		['plainSubstrByWidth(', 'substrByWidth('],
+		['s.withColor(0x8C7BFF)', 's.setColor(net.minecraft.ChatFormatting.LIGHT_PURPLE)'],
+		['s.withColor(0x3FD07A)', 's.setColor(net.minecraft.ChatFormatting.GREEN)'],
+		['s.withColor(ChatFormatting.AQUA)', 's.setColor(ChatFormatting.AQUA)'],
+		['.withBold(true)', '.setBold(true)'],
+		['.withClickEvent(', '.setClickEvent('],
+		['.withHoverEvent(', '.setHoverEvent('],
+		['message.copy()', 'message.deepCopy()'],
+		['InputConstants.Type.KEYSYM.getOrCreate(value).getDisplayName().getString()', 'com.orbitclient.compat.Texts.keyName(value)'],
+		['SystemToast.add(', 'SystemToast.addOrUpdate('],
+		['setIcon(Items.TARGET);', 'setIcon(Items.ARROW);'],
+		['setIcon(Items.LODESTONE);', 'setIcon(Items.COMPASS);'],
+		['mc.player.getBlockX()', 'net.minecraft.util.Mth.floor(mc.player.getX())'],
+		['mc.player.getBlockY()', 'net.minecraft.util.Mth.floor(mc.player.getY())'],
+		['mc.player.getBlockZ()', 'net.minecraft.util.Mth.floor(mc.player.getZ())'],
+		['mc.getSingleplayerServer().getWorldData().getLevelName()', 'mc.getSingleplayerServer().getLevelName()'],
+		['mc.level.dimension().identifier().toString()', 'net.minecraft.world.level.dimension.DimensionType.getName(mc.level.dimension.getType()).toString()'],
+		['import net.minecraft.server.packs.repository.Pack;', 'import net.minecraft.server.packs.repository.UnopenedPack;'],
+		['List<Pack> packs', 'List<UnopenedPack> packs'],
+		['.getSelectedPacks()', '.getSelected()'],
+		['mc.player.isDeadOrDying()', '(!mc.player.isAlive())'],
+	])
+	// Before 1.15.2: no multiplayer warning screen.
+	oneWay(v.matches('<1.15.2'), [
+		['import net.minecraft.client.gui.screens.multiplayer.SafetyScreen;', '// The multiplayer warning is new in 1.15.2'],
+		['minecraft.setScreen(minecraft.options.skipMultiplayerWarning ? new JoinMultiplayerScreen(this) : new SafetyScreen(this));', 'minecraft.setScreen(new JoinMultiplayerScreen(this));'],
+	])
+	// 1.17 itself: the Fabric API that loads on it still has the layer callback in its old package.
+	oneWay(mc == '1.17', [
+		['net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback.EVENT.register(',
+			'net.fabricmc.fabric.api.client.rendereregistry.v1.LivingEntityFeatureRendererRegistrationCallback.EVENT.register('],
+	])
+	// Minecraft 1.16 itself: the Fabric API that loads on it has no tick, lifecycle or tooltip events, so Orbit
+	// fires its own (com.orbitclient.compat, OwnEventsMixin).
+	oneWay(v.matches('<1.16.1'), [
+		['import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;', 'import com.orbitclient.compat.ClientLifecycleEvents;'],
+		['import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;', 'import com.orbitclient.compat.ClientTickEvents;'],
+		['net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback.EVENT.register(', 'com.orbitclient.compat.ItemTooltipCallback.EVENT.register('],
+	])
 	oneWay(unobfuscated && v.matches('<26.3'), [
 		['new OptionsScreen(this, minecraft.options)', 'new OptionsScreen(this, minecraft.options, false)'],
 		['return GLFW.glfwGetKey(Minecraft.getInstance().getWindow().handle(), key) == GLFW.GLFW_PRESS;', 'return com.mojang.blaze3d.platform.InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), key);'],
@@ -437,7 +624,9 @@ def javaVersion = unobfuscated ? 25 : stonecutter.current.parsed.matches('>=1.20
 
 processResources {
 	// Mixin's compatibility level stops at JAVA_21 in some loader versions; 21 also covers 26.x.
-	def props = [version: project.version, minecraft: minecraftRange, java: javaVersion, mixinJava: Math.min(javaVersion, 21)]
+	// Fabric API's mod id was "fabric" until 0.59: the newest one for these versions is older than that.
+	def fabricApiId = (stonecutter.current.parsed.matches('<1.17') || mc in ['1.17', '1.17.1', '1.18', '1.18.1', '1.19', '1.19.1']) ? 'fabric' : 'fabric-api'
+	def props = [version: project.version, minecraft: minecraftRange, java: javaVersion, mixinJava: Math.min(javaVersion, 21), fabricApiId: fabricApiId]
 	inputs.properties props
 	filesMatching(["fabric.mod.json", "*.mixins.json"]) {
 		expand props

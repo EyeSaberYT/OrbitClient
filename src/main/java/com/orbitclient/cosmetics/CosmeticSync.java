@@ -14,7 +14,6 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,8 +36,15 @@ public final class CosmeticSync {
 		return t;
 	});
 	private static final long REFRESH_MS = 60_000;
-	private static long claimsAt;
+	/** When claims were last asked for; 0 asks on the next tick (see {@link #requestRefresh}). */
+	private static volatile long claimsAt;
 	private static long uploadRetryAt;
+	/** A claims request is in flight (the wardrobe shows "Checking..."). */
+	private static volatile boolean checkingClaims;
+
+	/** A sign-in token and the account it was issued to. */
+	public record Session(String token, UUID user) {
+	}
 
 	private static volatile String token;
 	private static volatile String tokenServer;
@@ -121,17 +127,32 @@ public final class CosmeticSync {
 			ctx.close();
 		}
 	}
+	/**
+	 * Ask the server for this account's claims on the next tick: opening the wardrobe, its Refresh
+	 * button, and signing in all call this. Website redemptions then show up without a restart.
+	 */
+	public static void requestRefresh() {
+		claimsAt = 0;
+	}
+
+	/** True while a claims request is in flight. */
+	public static boolean checkingClaims() {
+		return checkingClaims;
+	}
+
 	public static void tick() {
 		Minecraft mc = Minecraft.getInstance();
+		UUID account = mc.getUser().getProfileId();
+		// Each account wears and owns only its own things, even before the server is known.
+		CosmeticManager.useAccount(account);
 		String server = server();
-		if (server == null || mc.level == null || mc.player == null || busy) return;
-		if (!server.equals(tokenServer) || !mc.getUser().getProfileId().equals(tokenUser)) {
+		if (server == null || busy) return;
+		if (!server.equals(tokenServer) || !account.equals(tokenUser)) {
 			// Another server or another account (switched in-game): sign in again and upload this account's loadout.
 			uploadedOnce = false;
 			FETCHED.clear();
 			claimsAt = 0;
 			uploadRetryAt = 0;
-			CosmeticManager.setOwned(Set.of());
 		}
 		if (!uploadedOnce || (uploadPending && System.currentTimeMillis() >= uploadAt)) {
 			if (System.currentTimeMillis() < uploadRetryAt) return;
@@ -146,6 +167,7 @@ public final class CosmeticSync {
 			run(() -> refreshClaims(server));
 			return;
 		}
+		if (mc.level == null || mc.player == null) return;
 		if (++tickCounter % 100 != 0 || !ClientSettings.INSTANCE.showOthersCosmetics.isOn()) return;
 		long now = System.currentTimeMillis();
 		List<UUID> wanted = new ArrayList<>();
@@ -184,6 +206,12 @@ public final class CosmeticSync {
 	 * off the game thread. Shared with the friends service.
 	 */
 	public static synchronized String token(String server) throws Exception {
+		Session s = session(server);
+		return s == null ? null : s.token();
+	}
+
+	/** Like {@link #token}, together with the account the token belongs to. Null when signing in failed. */
+	public static synchronized Session session(String server) throws Exception {
 		UUID user = Minecraft.getInstance().getUser().getProfileId();
 		if (!server.equals(tokenServer) || !user.equals(tokenUser)) {
 			token = null;
@@ -191,7 +219,7 @@ public final class CosmeticSync {
 			tokenUser = user;
 		}
 		if (token == null && !signIn(server)) return null;
-		return token;
+		return new Session(token, user);
 	}
 
 	/** The server answered 401 with this token: the next {@link #token} signs in again. */
@@ -229,13 +257,14 @@ public final class CosmeticSync {
 	private static void upload(String server, String ignoredBody) {
 		try {
 			for (int attempt = 0; attempt < 2; attempt++) {
-				String t = token(server);
-				if (t == null) {
+				Session session = session(server);
+				if (session == null) {
 					uploadedOnce = false;
 					uploadRetryAt = System.currentTimeMillis() + 15_000;
 					return;
 				}
-				if (!refreshClaims(server, t)) {
+				String t = session.token();
+				if (!refreshClaims(server, session)) {
 					uploadedOnce = false;
 					uploadRetryAt = System.currentTimeMillis() + 15_000;
 					return;
@@ -267,41 +296,57 @@ public final class CosmeticSync {
 	/** Fetch account-bound claims through the authenticated cosmetics-server token. */
 	private static boolean refreshClaims(String server) {
 		try {
-			String t = token(server);
-			return t != null && refreshClaims(server, t);
+			Session session = session(server);
+			return session != null && refreshClaims(server, session);
 		} catch (Exception e) {
 			status = "Can't verify cosmetic claims right now";
 			return false;
 		}
 	}
 
-	private static boolean refreshClaims(String server, String t) throws Exception {
-		HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/shop/claims")).timeout(Duration.ofSeconds(8))
-			.header("Authorization", "Bearer " + t).GET().build(), HttpResponse.BodyHandlers.ofString());
-		if (r.statusCode() == 401) {
-			invalidate(t);
-			status = "Sign in again to check cosmetic claims";
-			return false;
-		}
-		if (r.statusCode() != 200) {
-			status = r.statusCode() == 503 ? "Claim verification is unavailable" : "Cosmetics server error (" + r.statusCode() + ")";
-			return false;
-		}
-		JsonObject response = JsonParser.parseString(r.body()).getAsJsonObject();
-		Set<String> owned = new HashSet<>();
-		if (response.has("cosmetics") && response.get("cosmetics").isJsonArray()) {
-			response.getAsJsonArray("cosmetics").forEach(value -> {
-				if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) owned.add(value.getAsString());
+	/**
+	 * Ask for the claims of {@code session}'s account and install them. On any failure (offline,
+	 * 401/503, a malformed answer, an answer about another account, or the player switched accounts
+	 * meanwhile) nothing changes: the ownership already shown stays, and the next refresh tries again.
+	 */
+	private static boolean refreshClaims(String server, Session session) throws Exception {
+		checkingClaims = true;
+		try {
+			HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/shop/claims")).timeout(Duration.ofSeconds(8))
+				.header("Authorization", "Bearer " + session.token()).GET().build(), HttpResponse.BodyHandlers.ofString());
+			if (r.statusCode() == 401) {
+				invalidate(session.token());
+				status = "Sign in again to check cosmetic claims";
+				return false;
+			}
+			if (r.statusCode() != 200) {
+				status = r.statusCode() == 503 ? "Claim verification is unavailable; showing what you had" : "Cosmetics server error (" + r.statusCode() + ")";
+				return false;
+			}
+			Set<String> owned;
+			try {
+				owned = ClaimsResponse.parse(r.body(), session.user());
+			} catch (IllegalArgumentException malformed) {
+				status = "Can't verify cosmetic claims right now";
+				return false;
+			}
+			CompletableFuture<Boolean> applied = new CompletableFuture<>();
+			Minecraft.getInstance().execute(() -> {
+				try {
+					// Still the same account? A late answer must not land on the account switched to.
+					boolean same = session.user().equals(Minecraft.getInstance().getUser().getProfileId());
+					if (same) CosmeticManager.setOwned(session.user(), owned);
+					applied.complete(same);
+				} catch (Throwable error) {
+					applied.completeExceptionally(error);
+				}
 			});
+			if (!applied.join()) return false;
+			claimsAt = System.currentTimeMillis();
+			return true;
+		} finally {
+			checkingClaims = false;
 		}
-		CompletableFuture<Void> applied = new CompletableFuture<>();
-		Minecraft.getInstance().execute(() -> {
-			try { CosmeticManager.setOwned(owned); applied.complete(null); }
-			catch (Throwable error) { applied.completeExceptionally(error); }
-		});
-		applied.join();
-		claimsAt = System.currentTimeMillis();
-		return true;
 	}
 
 	private static void fetch(String server, List<UUID> uuids) {

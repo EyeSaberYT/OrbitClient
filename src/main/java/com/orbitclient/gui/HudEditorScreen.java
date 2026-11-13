@@ -110,12 +110,12 @@ public class HudEditorScreen extends Screen {
 				Render2D.lerpColor(0xE0161616, 0xF02A2A2A, buttonHover), Render2D.lerpColor(Theme.TAB_BORDER, 0xFF6A6A6A, buttonHover));
 			String label = "MODS";
 			int lw = 0;
-			for (char c : label.toCharArray()) lw += font.width(Component.literal(String.valueOf(c)).withStyle(ChatFormatting.BOLD)) + 2;
+			for (char c : label.toCharArray()) lw += UiText.width(Component.literal(String.valueOf(c)).withStyle(ChatFormatting.BOLD)) + 2;
 			int lx = (width - (lw - 2)) / 2;
 			for (char c : label.toCharArray()) {
 				Component ch = Component.literal(String.valueOf(c)).withStyle(ChatFormatting.BOLD);
 				Render2D.text(g, font, ch, lx, by + 7, 0xFFFFFFFF, false);
-				lx += font.width(ch) + 2;
+				lx += UiText.width(ch) + 2;
 			}
 			g.pose().popMatrix();
 
@@ -145,9 +145,9 @@ public class HudEditorScreen extends Screen {
 		double mx = event.x(), my = event.y();
 		HudModule module = moduleAt(mx, my);
 		if (module != null) {
-			if (event.button() == 1) {
+			if (event.button() == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
 				closeThen(() -> minecraft.setScreen(new OrbitScreen(module)));
-			} else if (event.button() == 0) {
+			} else if (event.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
 				dragging = module;
 				dragOffsetX = (int) mx - module.getX(width);
 				dragOffsetY = (int) my - module.getY(height);
@@ -155,7 +155,7 @@ public class HudEditorScreen extends Screen {
 			return true;
 		}
 		int bx = (width - BUTTON_W) / 2, by = (height - BUTTON_H) / 2;
-		if (event.button() == 0 && Render2D.hovered(mx, my, bx, by, BUTTON_W, BUTTON_H)) {
+		if (event.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT && Render2D.hovered(mx, my, bx, by, BUTTON_W, BUTTON_H)) {
 			closeThen(() -> minecraft.setScreen(new OrbitScreen()));
 			return true;
 		}

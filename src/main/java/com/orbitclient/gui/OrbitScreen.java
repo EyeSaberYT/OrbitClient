@@ -975,7 +975,7 @@ public class OrbitScreen extends Screen {
 						return;
 					}
 				}
-				settingsList.mouseClicked(mx, my, 0);
+				settingsList.mouseClicked(mx, my, GLFW.GLFW_MOUSE_BUTTON_LEFT);
 			}
 			return;
 		}

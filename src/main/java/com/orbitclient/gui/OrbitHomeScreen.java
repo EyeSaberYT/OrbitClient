@@ -401,12 +401,23 @@ public final class OrbitHomeScreen extends TitleScreen {
 		UiText.text(g, hoveredLabel, x + 5, y + 3, 0xFFFFFFFF);
 	}
 
+	/** For the development audit: how many clicks reached this screen. */
+	public static int auditClicks;
+
+	/** For the development audit: the middle of the first button drawn, in GUI pixels (null before the first frame). */
+	public int[] auditFirstButton() {
+		if (hits.isEmpty()) return null;
+		Hit h = hits.get(0);
+		return new int[]{h.x + h.w / 2, h.y + h.h / 2};
+	}
+
 	// ================================================================ input
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+		auditClicks++;
 		double mx = event.x(), my = event.y();
-		if (event.button() != 0) return super.mouseClicked(event, doubleClick);
+		if (event.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return super.mouseClicked(event, doubleClick);
 		if (Render2D.hovered(mx, my, chipX, chipY, chipW, chipH)) {
 			click();
 			togglePopup();

@@ -1,6 +1,6 @@
 package com.orbitclient.mixin;
 
-//? if <1.20.5 {
+//? if >=1.20 <1.20.5 {
 /*import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
 /^*
- * Before 1.20.5 (see GuiHudMixin for 1.20.5 to 1.21.5): the HUD is drawn in one method, so the parts with a
+ * 1.20 to 1.20.4 (see GuiHudMixin for 1.20.5 to 1.21.5, GuiHudOldMixin before 1.20): the HUD is drawn in one method, so the parts with a
  * method of their own are wrapped, and the chat and tab list where render() draws them. The food bar is drawn
  * inside the hearts, so things attached to it go around those. Titles have no seam to hook here.
  ^/

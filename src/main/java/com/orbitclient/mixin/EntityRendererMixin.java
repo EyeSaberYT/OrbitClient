@@ -33,9 +33,20 @@ public class EntityRendererMixin {
 		if (lifted) pose.popPose();
 	}
 	*///?}
-	//? if <1.20.5 {
+	//? if >=1.16 <1.20.5 {
 	/*@com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod(method = "renderNameTag")
 	private void orbit$liftNameTag(Entity entity, net.minecraft.network.chat.Component name, com.mojang.blaze3d.vertex.PoseStack pose,
+	                               net.minecraft.client.renderer.MultiBufferSource buffers, int light,
+	                               com.llamalad7.mixinextras.injector.wrapoperation.Operation<Void> original) {
+		boolean lifted = lift(entity, pose);
+		original.call(entity, name, pose, buffers, light);
+		if (lifted) pose.popPose();
+	}
+	*///?}
+	//? if <1.16 {
+	/*// Before 1.16 the name is a plain string.
+	@com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod(method = "renderNameTag")
+	private void orbit$liftNameTag(Entity entity, String name, com.mojang.blaze3d.vertex.PoseStack pose,
 	                               net.minecraft.client.renderer.MultiBufferSource buffers, int light,
 	                               com.llamalad7.mixinextras.injector.wrapoperation.Operation<Void> original) {
 		boolean lifted = lift(entity, pose);

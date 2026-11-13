@@ -1,5 +1,7 @@
 package com.orbitclient.mixin;
 
+// Minecraft.createTitle is new in 1.15.2.
+//? if >=1.15.2 {
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
@@ -13,3 +15,4 @@ public class WindowTitleMixin {
 		return title.replaceFirst("^Minecraft\\*?", "Orbit Client");
 	}
 }
+//?}

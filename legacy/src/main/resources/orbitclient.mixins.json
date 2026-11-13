@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "com.orbitclient.legacy.mixin",
+	"compatibilityLevel": "JAVA_17",
+	"client": [
+		${generationMixins}"AbstractClientPlayerEntityMixin",
+		"MinecraftClientMixin",
+		"PlayerEntityRendererMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

@@ -192,9 +192,12 @@ public class CrosshairModule extends Module {
 		//? if >=1.21.6 <1.21.7 {
 		/*RenderPipeline pipeline = RenderPipelines.GUI; // 1.21.6 has no inverting fill: blend draws in its color
 		*///?}
-		//? if <1.21.6 {
+		//? if >=1.20 <1.21.6 {
 		/*// Before 1.21.6 GUI fills had no inverting blend either: blend draws in its color.
 		net.minecraft.client.renderer.RenderType pipeline = net.minecraft.client.renderer.RenderType.gui();
+		*///?}
+		//? if <1.20 {
+		/*Object pipeline = null; // Before 1.20 GUI fills had no render layer to name.
 		*///?}
 		// The inverting blend has to run in its own layer after what's behind it (vanilla does the same),
 		// otherwise menus draw it before their own backgrounds and it disappears.

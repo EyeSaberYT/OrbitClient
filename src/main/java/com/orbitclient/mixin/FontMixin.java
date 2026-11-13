@@ -1,5 +1,7 @@
 package com.orbitclient.mixin;
 
+// Text layouts can only be reused from 1.21.6 (Font.prepareText).
+//? if >=1.21.6 {
 import com.orbitclient.util.TextLayoutCache;
 import net.minecraft.client.gui.Font;
 //? if >=1.21.9 {
@@ -73,3 +75,4 @@ public abstract class FontMixin {
 	}
 	*///?}
 }
+//?}

@@ -1,0 +1,19 @@
+{
+	"schemaVersion": 1,
+	"id": "orbitclient",
+	"version": "${version}",
+	"name": "Orbit Client",
+	"description": "Orbit Client for Minecraft 1.8.9: Orbit cosmetics on the old engine.",
+	"authors": ["EyeSaber"],
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["com.orbitclient.legacy.OrbitLegacy"]
+	},
+	"mixins": ["orbitclient.mixins.json"],
+	"depends": {
+		"fabricloader": ">=0.16.0",
+		"minecraft": "${minecraft}",
+		"java": ">=${java}"
+	}
+}

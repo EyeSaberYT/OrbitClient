@@ -50,7 +50,33 @@ public class GuiMixin {
 	}
 	*///?}
 
-	//? if <1.20.2 {
+	//? if <1.16 {
+	/*// Before 1.16 it takes no pose stack either.
+	@WrapOperation(method = "renderHotbar", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;blit(IIIIII)V"))
+	private void orbit$smoothHotbar(net.minecraft.client.gui.Gui gui, int x, int y, int u, int v, int w, int h, Operation<Void> original) {
+		original.call(gui, u == 0 && v == 22 && w == 24 ? VanillaAnimations.hotbarSelectionX(x) : x, y, u, v, w, h);
+	}
+	*///?}
+
+	//? if >=1.16 <1.19.4 {
+	/*// Before 1.19.4 that blit is an instance method (the Gui itself comes first).
+	@WrapOperation(method = "renderHotbar", at = @At(value = "INVOKE",
+		target = "Lnet/minecraft/client/gui/Gui;blit(Lcom/mojang/blaze3d/vertex/PoseStack;IIIIII)V"))
+	private void orbit$smoothHotbar(net.minecraft.client.gui.Gui gui, com.mojang.blaze3d.vertex.PoseStack pose, int x, int y, int u, int v, int w, int h, Operation<Void> original) {
+		original.call(gui, pose, u == 0 && v == 22 && w == 24 ? VanillaAnimations.hotbarSelectionX(x) : x, y, u, v, w, h);
+	}
+	*///?}
+
+	//? if >=1.19.4 <1.20 {
+	/*// Before 1.20 the selection is drawn with GuiComponent's static blit on the already-bound widgets texture.
+	@WrapOperation(method = "renderHotbar", at = @At(value = "INVOKE",
+		target = "Lnet/minecraft/client/gui/Gui;blit(Lcom/mojang/blaze3d/vertex/PoseStack;IIIIII)V"))
+	private void orbit$smoothHotbar(com.mojang.blaze3d.vertex.PoseStack pose, int x, int y, int u, int v, int w, int h, Operation<Void> original) {
+		original.call(pose, u == 0 && v == 22 && w == 24 ? VanillaAnimations.hotbarSelectionX(x) : x, y, u, v, w, h);
+	}
+	*///?}
+
+	//? if >=1.20 <1.20.2 {
 	/*// Before 1.20.2 there are no GUI sprites: the selection is the 24x22 piece at (0, 22) of the widgets texture.
 	@WrapOperation(method = "renderHotbar", at = @At(value = "INVOKE",
 		target = "Lnet/minecraft/client/gui/GuiGraphics;blit(Lnet/minecraft/resources/Identifier;IIIIII)V"))

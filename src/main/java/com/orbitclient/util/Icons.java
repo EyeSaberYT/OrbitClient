@@ -79,7 +79,7 @@ public final class Icons {
 		if (LOADED.containsKey(key)) return LOADED.get(key);
 		Identifier id = null;
 		Minecraft mc = Minecraft.getInstance();
-		Optional<Resource> resource = mc.getResourceManager().getResource(resource(size, name));
+		var resource = mc.getResourceManager().getResource(resource(size, name));
 		if (resource.isPresent()) {
 			try (InputStream in = resource.get().open()) {
 				id = Identifier.fromNamespaceAndPath("orbitclient", "dynamic/icon/" + size + "/" + name);

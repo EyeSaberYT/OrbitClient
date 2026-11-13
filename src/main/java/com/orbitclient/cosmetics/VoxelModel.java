@@ -39,6 +39,12 @@ public final class VoxelModel {
 	// Per face: 4 corners x 3 coordinates, a normal, a paint index.
 	private final float[] corners;
 	private final byte[] normals;
+	// The same faces for drawing: neighbouring faces share their corners, so each distinct corner is kept
+	// once (points, x y z in pixels) and a face names its four by index. dirs is each face's direction (DIRS).
+	private final float[] points;
+	private final int pointCount;
+	private final int[] cornerIndex;
+	private final byte[] dirs;
 	private final int[] paints;
 	private final Paint[] palette;
 	private final int faces;
@@ -56,6 +62,33 @@ public final class VoxelModel {
 		this.paints = paints;
 		this.palette = palette;
 		this.faces = faces;
+		Map<Long, Integer> seen = new HashMap<>();
+		float[] unique = new float[faces * 12];
+		this.cornerIndex = new int[faces * 4];
+		this.dirs = new byte[faces];
+		int count = 0;
+		for (int f = 0; f < faces; f++) {
+			for (int v = 0; v < 4; v++) {
+				int o = f * 12 + v * 3;
+				// Corners sit on a grid of at most a few hundred steps: 21 bits each tells them apart exactly.
+				long key = ((long) Float.floatToIntBits(corners[o]) * 0x9E3779B97F4A7C15L)
+					^ ((long) Float.floatToIntBits(corners[o + 1]) * 0xC2B2AE3D27D4EB4FL)
+					^ ((long) Float.floatToIntBits(corners[o + 2]) * 0x165667B19E3779F9L);
+				Integer index = seen.get(key);
+				if (index == null || unique[index * 3] != corners[o] || unique[index * 3 + 1] != corners[o + 1] || unique[index * 3 + 2] != corners[o + 2]) {
+					index = count++;
+					unique[index * 3] = corners[o];
+					unique[index * 3 + 1] = corners[o + 1];
+					unique[index * 3 + 2] = corners[o + 2];
+					seen.put(key, index);
+				}
+				cornerIndex[f * 4 + v] = index;
+			}
+			int nx = normals[f * 3], ny = normals[f * 3 + 1], nz = normals[f * 3 + 2];
+			dirs[f] = (byte) (nx < 0 ? 0 : nx > 0 ? 1 : ny < 0 ? 2 : ny > 0 ? 3 : nz < 0 ? 4 : 5);
+		}
+		this.points = java.util.Arrays.copyOf(unique, count * 3);
+		this.pointCount = count;
 	}
 
 	/**
@@ -97,20 +130,64 @@ public final class VoxelModel {
 		float[] corners = new float[max * 12];
 		byte[] normals = new byte[max * 3];
 		int[] paints = new int[max];
-		int f = 0;
 		float top = Float.NaN;
-		for (int y = 0; y < ny; y++) {
-			for (int z = 0; z < nz; z++) {
+		for (int y = 0; y < ny && Float.isNaN(top); y++) {
+			for (int z = 0; z < nz && Float.isNaN(top); z++) {
 				for (int x = 0; x < nx; x++) {
-					char c = grid[y][z][x];
-					if (c == '.') continue;
-					if (Float.isNaN(top)) top = oy + y * size;
-					float x0 = ox + x * size, y0 = oy + y * size, z0 = oz + z * size;
-					float x1 = x0 + size, y1 = y0 + size, z1 = z0 + size;
-					for (int d = 0; d < 6; d++) {
-						int ax = x + DIRS[d][0], ay = y + DIRS[d][1], az = z + DIRS[d][2];
+					if (grid[y][z][x] != '.') {
+						top = oy + y * size;
+						break;
+					}
+				}
+			}
+		}
+
+		// The surface, one direction at a time. Within a layer, neighbouring uncovered voxel faces of the same
+		// paint are merged into rectangles: a flat one-color area is a few faces instead of one per voxel,
+		// which is most of what there is to draw.
+		int f = 0;
+		int[] extent = {nx, ny, nz};
+		for (int d = 0; d < 6; d++) {
+			int axis = d / 2;
+			// The two axes across the layer: (z, y) for x, (x, z) for y, (x, y) for z.
+			int ua = axis == 0 ? 2 : 0, va = axis == 1 ? 2 : 1;
+			int nu = extent[ua], nv = extent[va];
+			int[][] mask = new int[nv][nu];
+			int[] at = new int[3];
+			for (int layer = 0; layer < extent[axis]; layer++) {
+				for (int v = 0; v < nv; v++) {
+					for (int u = 0; u < nu; u++) {
+						at[axis] = layer;
+						at[ua] = u;
+						at[va] = v;
+						char c = grid[at[1]][at[2]][at[0]];
+						int ax = at[0] + DIRS[d][0], ay = at[1] + DIRS[d][1], az = at[2] + DIRS[d][2];
 						boolean covered = ax >= 0 && ay >= 0 && az >= 0 && ax < nx && ay < ny && az < nz && grid[ay][az][ax] != '.';
-						if (covered) continue;
+						mask[v][u] = c == '.' || covered ? 0 : index.get(c) + 1;
+					}
+				}
+				for (int v = 0; v < nv; v++) {
+					for (int u = 0; u < nu; u++) {
+						int paint = mask[v][u];
+						if (paint == 0) continue;
+						int w = 1;
+						while (u + w < nu && mask[v][u + w] == paint) w++;
+						int h = 1;
+						grow:
+						while (v + h < nv) {
+							for (int k = 0; k < w; k++) if (mask[v + h][u + k] != paint) break grow;
+							h++;
+						}
+						for (int dv = 0; dv < h; dv++) java.util.Arrays.fill(mask[v + dv], u, u + w, 0);
+						// The rectangle as a box of voxels, one layer thick.
+						int[] lo = new int[3], hi = new int[3];
+						lo[axis] = hi[axis] = layer;
+						lo[ua] = u;
+						hi[ua] = u + w - 1;
+						lo[va] = v;
+						hi[va] = v + h - 1;
+						float x0 = ox + lo[0] * size, y0 = oy + lo[1] * size, z0 = oz + lo[2] * size;
+						float x1 = ox + (hi[0] + 1) * size, y1 = oy + (hi[1] + 1) * size, z1 = oz + (hi[2] + 1) * size;
 						float[] q = switch (d) {
 							case 0 -> new float[]{x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0};
 							case 1 -> new float[]{x1, y0, z1, x1, y0, z0, x1, y1, z0, x1, y1, z1};
@@ -123,7 +200,7 @@ public final class VoxelModel {
 						normals[f * 3] = (byte) DIRS[d][0];
 						normals[f * 3 + 1] = (byte) DIRS[d][1];
 						normals[f * 3 + 2] = (byte) DIRS[d][2];
-						paints[f] = index.get(c);
+						paints[f] = paint - 1;
 						f++;
 					}
 				}
@@ -293,20 +370,27 @@ public final class VoxelModel {
 	}
 
 	/** Draws the model at the pose (in model pixels). tint is the chosen color; alpha fades the whole model. */
+	/** How many models and faces have been drawn since the game started (for the performance test). */
+	public static long drawnModels, drawnFaces;
+
 	public void render(PoseStack.Pose pose, VertexConsumer consumer, int light, int tint, float alpha) {
-		float s = 1 / 16f;
-		for (int f = 0; f < faces; f++) {
-			Paint p = palette[paints[f]];
+		drawnModels++;
+		drawnFaces += faces;
+		// Every corner is placed once and every direction turned once for this draw (see Vertices.Batch);
+		// the faces then only pick them. Drawing the same model vertex by vertex did that work up to four
+		// times per corner and once per vertex for the direction.
+		com.orbitclient.util.Vertices.Batch batch = com.orbitclient.util.Vertices.begin(consumer, pose, points, pointCount, 1 / 16f);
+		int[] colors = new int[palette.length];
+		for (int i = 0; i < palette.length; i++) {
+			Paint p = palette[i];
 			int color = p.tinted ? shade(tint, p.shade) : p.argb;
 			int a = Math.round(((color >>> 24) & 0xFF) * alpha);
-			color = (a << 24) | (color & 0xFFFFFF);
-			int lit = p.glow ? FULL_BRIGHT : light;
-			float nx = normals[f * 3], ny = normals[f * 3 + 1], nz = normals[f * 3 + 2];
-			int o = f * 12;
-			for (int v = 0; v < 4; v++) {
-				com.orbitclient.util.Vertices.add(consumer, pose, corners[o + v * 3] * s, corners[o + v * 3 + 1] * s, corners[o + v * 3 + 2] * s,
-					color, 0.5f, 0.5f, OverlayTexture.NO_OVERLAY, lit, nx, ny, nz);
-			}
+			colors[i] = (a << 24) | (color & 0xFFFFFF);
+		}
+		for (int f = 0; f < faces; f++) {
+			int paint = paints[f], o = f * 4;
+			batch.quad(cornerIndex[o], cornerIndex[o + 1], cornerIndex[o + 2], cornerIndex[o + 3],
+				colors[paint], palette[paint].glow ? FULL_BRIGHT : light, dirs[f]);
 		}
 	}
 

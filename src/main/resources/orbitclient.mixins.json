@@ -15,7 +15,6 @@
 		"ChatScreenMixin",
 		"EntityMixin",
 		"EntityRendererMixin",
-		"FontMixin",
 		"FoodDataAccessor",
 		"GameRendererMixin",
 		"GuiMixin",
@@ -28,15 +27,13 @@
 		"MinecraftMixin",
 		"MouseHandlerMixin",
 		"MultiPlayerGameModeMixin",
-		"OptionInstanceMixin",
 		"OverlayTextureAccessor",
 		"PlayerNameMixin",
 		"PlayerTabOverlayMixin",
 		"ScreenEffectRendererMixin",
 		"ScreenInvoker",
 		"ScreenshotMixin",
-		"SoundEngineMixin",
-		"WindowTitleMixin"
+		"SoundEngineMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

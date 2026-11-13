@@ -307,7 +307,7 @@ public class SettingsList {
 			} else if (s instanceof ModeSetting m) {
 				int bw = 90;
 				if (Render2D.hovered(mx, my, rx - bw, ry + 4, bw, 14)) {
-					int dir = button == 1 || mx < rx - bw * 2 / 3 ? -1 : 1;
+					int dir = button == GLFW.GLFW_MOUSE_BUTTON_RIGHT || mx < rx - bw * 2 / 3 ? -1 : 1;
 					modePrevious.put(m, m.get());
 					m.cycle(dir);
 					modeChange.put(m, new long[]{System.currentTimeMillis(), dir});

@@ -1,0 +1,79 @@
+plugins {
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+}
+
+// One jar per version: `gradle build -Pmc=1.14.2` (1.14.4 when not given), each in build/<version>.
+def mc = (project.findProperty('mc') ?: project.minecraft_version).toString()
+def supported = ['1.14', '1.14.1', '1.14.2', '1.14.3', '1.14.4']
+if (!(mc in supported)) throw new GradleException("Unsupported -Pmc=${mc}: one of ${supported}")
+// Every 1.14 release is named with 1.14.4's mappings: the earlier releases' own mappings use older names for
+// the same classes (and Loom can't set some of them up), while the intermediate names underneath are shared.
+def yarn = '1.14.4+build.18'
+layout.buildDirectory = file("build/${mc}")
+
+version = "${project.mod_version}+${mc}"
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${mc}"
+	mappings "net.fabricmc:yarn:${yarn}:v2"
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+}
+
+// The cosmetic art and the ownership rules are the main client's own files, as in ../legacy.
+def sharedCosmetics = ['Hats', 'Backs', 'Auras', 'Pets', 'Wings', 'Faces', 'Capes', 'Cosmetics', 'CosmeticSlot',
+	'VoxelModel', 'ClaimsResponse', 'AccountOutfits']
+def sharedDir = layout.buildDirectory.dir('generated/shared')
+def syncShared = tasks.register('syncShared', Copy) {
+	from('../src/main/java/com/orbitclient/cosmetics') {
+		include sharedCosmetics.collect { "${it}.java".toString() }
+	}
+	into sharedDir.map { it.dir('com/orbitclient/cosmetics') }
+	filter { String line ->
+		line.replace('import com.mojang.blaze3d.vertex.PoseStack;', 'import com.orbitclient.legacy.gl.PoseStack;')
+			.replace('import com.mojang.blaze3d.vertex.VertexConsumer;', 'import com.orbitclient.legacy.gl.VertexConsumer;')
+			.replace('import com.mojang.math.Axis;', 'import com.orbitclient.legacy.gl.Axis;')
+			.replace('import net.minecraft.world.phys.Vec3;', 'import com.orbitclient.legacy.gl.Vec3;')
+			.replace('import net.minecraft.client.renderer.texture.OverlayTexture;', 'import com.orbitclient.legacy.gl.OverlayTexture;')
+			// Minecraft 1.14 ships a Gson without the static parser.
+			.replace('JsonParser.parseString(', 'new JsonParser().parse(')
+	}
+}
+sourceSets.main.java.srcDir(sharedDir)
+// Everything that doesn't name the game's classes (sync, ownership, the wardrobe's logic, the audit) is the
+// legacy client's; this folder holds the game-facing part in modern Fabric's names.
+sourceSets.main.java.srcDir('../legacy/src/main/java')
+tasks.named('compileJava') { dependsOn syncShared }
+tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn syncShared }
+
+def javaVersion = 17
+
+processResources {
+	def props = [version: project.version, minecraft: mc, java: javaVersion]
+	inputs.properties props
+	filesMatching('fabric.mod.json') {
+		expand props
+	}
+	from('../src/main/resources') {
+		include 'assets/orbitclient/textures/cosmetics/**'
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.encoding = 'UTF-8'
+	it.options.release = javaVersion
+}
+
+loom.runs.configureEach { runDir "run/${mc}" }
+
+// `gradle runClient -PstartAudit` and `-PshotAudit`: see ../legacy/README.md.
+if (project.hasProperty('startAudit')) {
+	loom.runs.client.vmArg '-Dorbit.startAudit=true'
+}
+if (project.hasProperty('shotAudit')) {
+	loom.runs.client.vmArg '-Dorbit.shotAudit=true'
+}
