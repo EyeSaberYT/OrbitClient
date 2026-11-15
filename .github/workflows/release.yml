@@ -15,6 +15,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # The release page starts with this version's section of CHANGELOG.md ("## v1.1.6" up to the next
+      # "## "). A tag without one stops here, before the long builds, so no release goes out without notes.
+      - name: Release notes from CHANGELOG.md
+        id: notes
+        run: |
+          notes=$(awk -v tag="## ${GITHUB_REF_NAME}" '{ sub(/\r$/, "") } $0 == tag { on = 1; next } on && /^## / { exit } on' CHANGELOG.md | sed -e '/./,$!d')
+          if [ -z "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
+            echo "::error::CHANGELOG.md has no notes under '## ${GITHUB_REF_NAME}'. Add them and tag again."
+            exit 1
+          fi
+          { echo 'body<<ORBIT_NOTES_END'; printf '%s\n' "$notes"; echo 'ORBIT_NOTES_END'; } >> "$GITHUB_OUTPUT"
       # Fabric Loom 1.19 runs on Java 25 (so does Minecraft 26.x); older versions' jars target Java 21, 17 or 8.
       # The Legacy Fabric projects (1.8 to 1.14) build on Java 21. The last version listed is the default.
       - uses: actions/setup-java@v5
@@ -55,22 +66,15 @@ jobs:
             legacy114/build/*/libs/orbit-client-*.jar
             !**/*-sources.jar
           body: |
+            ${{ steps.notes.outputs.body }}
+
+            **About these files**
             Orbit Client for Fabric: one jar per Minecraft version (orbit-client-<version>+<Minecraft version>.jar).
             Orbit Launcher installs and updates it automatically, picking the jar for each instance's Minecraft version.
 
             - 1.15 to 26.3, every release: the full client. Needs Fabric API.
             - 1.14 to 1.14.4, and 1.8.2 to 1.8.9, 1.9.4, 1.10.2, 1.11.2, 1.12.2 and 1.13.2 (Legacy Fabric): cosmetics
               and the wardrobe only. These need Java 17 or newer, which Orbit Launcher picks by itself.
-
-            Changes in 1.1.6:
-            - Fixed: nothing could be typed in Orbit's menu (Right Shift) or the wardrobe search on Minecraft 26.3.
-              26.3 only sends typed text to the game while a screen asks for it; Orbit's screens now do.
-
-            In 1.1.5: Motion Blur no longer leaves the world on 26.3, and copying a chat message with shift-click
-            no longer crashes 26.2 and 26.3.
-
-            In 1.1.4: clicks work on 26.3, every release from 1.15 to 26.3 is covered, and the cosmetics builds
-            for 1.8 to 1.14 are part of the release.
 
             Known limits by version:
             - 1.20.2 and older, and 26.2 and 26.3: switching accounts in game points you to Orbit Launcher (in-game
