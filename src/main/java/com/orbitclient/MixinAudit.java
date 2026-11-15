@@ -59,6 +59,7 @@ public final class MixinAudit {
 			int[] ticks = {0};
 			int[] clickAt = {0};
 			int[] homeAt = {0};
+			int[] menuAt = {0};
 			ClientTickEvents.END_CLIENT_TICK.register(mc -> {
 				Screen screen = mc.screen;
 				if (++ticks[0] > 1200) {
@@ -109,7 +110,17 @@ public final class MixinAudit {
 					} else if (clickAt[0] == 0 && failures.isEmpty()) {
 						failures.add("the home screen was never clicked");
 					}
-					report(failures, targets.size() + " target classes, first menu OrbitHomeScreen, a click opened " + screen.getClass().getSimpleName(), mc);
+					// Then typing: Orbit's menu must have the game receiving typed characters (26.3 only sends them
+					// while text input is on).
+					if (failures.isEmpty() && clickAt[0] != 0 && menuAt[0] == 0) {
+						menuAt[0] = ticks[0];
+						mc.setScreen(new com.orbitclient.gui.OrbitScreen());
+						return;
+					}
+					if (menuAt[0] != 0 && ticks[0] - menuAt[0] < 10) return;
+					if (menuAt[0] != 0 && !com.orbitclient.compat.TextInput.active()) failures.add("typing is off while Orbit's menu is open");
+					report(failures, targets.size() + " target classes, first menu OrbitHomeScreen, a click opened the next screen, typing "
+						+ (com.orbitclient.compat.TextInput.active() ? "on" : "off") + " in Orbit's menu", mc);
 				}
 			});
 		});

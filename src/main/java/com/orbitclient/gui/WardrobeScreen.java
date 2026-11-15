@@ -646,8 +646,16 @@ public class WardrobeScreen extends Screen {
 	}
 
 	@Override
+	public void removed() {
+		com.orbitclient.compat.TextInput.off(this);
+		super.removed();
+	}
+
+	@Override
 	public void tick() {
 		super.tick();
+		// 26.3: typed characters only arrive while text input is on (search, names, text settings).
+		com.orbitclient.compat.TextInput.keepOn(this);
 		if (closing && openProgress <= 0f) minecraft.setScreen(new OrbitScreen());
 	}
 

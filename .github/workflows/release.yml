@@ -62,11 +62,12 @@ jobs:
             - 1.14 to 1.14.4, and 1.8.2 to 1.8.9, 1.9.4, 1.10.2, 1.11.2, 1.12.2 and 1.13.2 (Legacy Fabric): cosmetics
               and the wardrobe only. These need Java 17 or newer, which Orbit Launcher picks by itself.
 
-            Changes in 1.1.5:
-            - Fixed: turning on Motion Blur on Minecraft 26.3 threw you out of the world (its shader did not
-              compile there).
-            - Fixed: shift-clicking a chat message to copy it crashed the game on 26.2 and 26.3. The same fault
-              was in the Chat mod's stacking of repeated messages.
+            Changes in 1.1.6:
+            - Fixed: nothing could be typed in Orbit's menu (Right Shift) or the wardrobe search on Minecraft 26.3.
+              26.3 only sends typed text to the game while a screen asks for it; Orbit's screens now do.
+
+            In 1.1.5: Motion Blur no longer leaves the world on 26.3, and copying a chat message with shift-click
+            no longer crashes 26.2 and 26.3.
 
             In 1.1.4: clicks work on 26.3, every release from 1.15 to 26.3 is covered, and the cosmetics builds
             for 1.8 to 1.14 are part of the release.
