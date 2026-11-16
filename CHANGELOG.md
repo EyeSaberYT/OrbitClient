@@ -5,6 +5,20 @@ onto the GitHub release page (and the Discord announcement), so write it for pla
 will notice, then what was fixed, with the Minecraft versions it affects. A release without a
 section here does not build.
 
+## v1.1.7
+
+**Security fix for cosmetics and friends sign-in, on every Minecraft version. Please update.**
+
+- **Fixed: someone on your network could log into Minecraft servers as you.** Orbit Client signed in
+  to the cosmetics server over plain HTTP and signed whatever "challenge" it received with Mojang.
+  Someone on the same Wi-Fi, or anyone who could fake the server, could hand over a real server's
+  login value and join that server (for example Hypixel) under your name. Orbit Client now mixes a
+  random number of its own into what it signs, so the value can't match any other server.
+- **Cosmetics and friends now use HTTPS** (`orbit-social.minearcade.org`), so friend lists, messages,
+  loadouts and the sign-in can't be read or changed on the way.
+- A reply from the server larger than 1 MB is refused instead of filling the game's memory, so a
+  fake or broken server can no longer crash the game this way.
+
 ## v1.1.6
 
 - **Fixed: typing on Minecraft 26.3.** Nothing could be typed in Orbit's menu (Right Shift) or in

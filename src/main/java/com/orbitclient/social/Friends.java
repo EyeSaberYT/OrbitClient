@@ -346,7 +346,7 @@ public final class Friends {
 			HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + path)).timeout(Duration.ofSeconds(10))
 				.header("Authorization", "Bearer " + token).header("Content-Type", "text/plain; charset=utf-8")
 				.POST(body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
-				.build(), HttpResponse.BodyHandlers.ofString());
+				.build(), CosmeticSync.limited());
 			if (r.statusCode() == 401 && attempt == 0) {
 				CosmeticSync.invalidate(token);
 				continue;

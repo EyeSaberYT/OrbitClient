@@ -71,102 +71,67 @@ public final class CosmeticSync {
 		});
 	}
 
-	// Where the cosmetics server is comes from DNS, not from the mod: an SRV record on this name gives its
-	// host and port, so the address can change without a new build. The same record the main client reads.
-	private static final String SRV_NAME = "_eclipse-cosmetics._tcp.minearcade.org";
-	private static final long RESOLVE_MS = 30 * 60_000;
-	private static volatile String resolved;
-	private static volatile long resolvedAt;
-	private static volatile boolean resolving;
-	/** For tests only: use this server instead of looking it up. */
+	/**
+	 * The cosmetics and friends server. HTTPS only (Cloudflare is in front of it): over plain HTTP anyone on
+	 * the player's network could read friends' messages and the sign-in token, or swap the sign-in challenge.
+	 */
+	public static final String SERVER = "https://orbit-social.minearcade.org";
+	/** Fixed start of what is signed with Mojang; the server and Orbit Launcher use the same. */
+	private static final String SIGN_IN_PREFIX = "orbit-sign-in-v2:";
+	/** The largest reply taken from the server; a bigger one is refused instead of filling the game's memory. */
+	private static final int MAX_REPLY = 1 << 20;
+	/** For tests only: use this server instead. */
 	public static volatile String testServer;
 
 	/** Short status for the wardrobe. */
 	public static String status() {
-		if (server() == null) return resolving || resolvedAt == 0 ? "Connecting to the cosmetics server..." : "Cosmetics server unavailable: only you see these right now";
-		return status;
+		return status.isEmpty() ? "Connecting to the cosmetics server..." : status;
 	}
 
-	/** The cosmetics server's address, or null while it isn't known. */
+	/** The cosmetics (and friends) server's address. */
 	public static String server() {
-		if (testServer != null) return testServer;
-		long now = System.currentTimeMillis();
-		if (!resolving && now - resolvedAt > (resolved == null ? 60_000 : RESOLVE_MS)) {
-			resolving = true;
-			CompletableFuture.runAsync(() -> {
-				try {
-					resolved = lookup();
-				} catch (Throwable e) {
-					// Keep the last known address (or none) and try again later.
-					System.err.println("[Orbit Client] Couldn't look up the cosmetics server: " + e);
-				} finally {
-					resolvedAt = System.currentTimeMillis();
-					resolving = false;
-				}
-			}, WORKER);
-		}
-		return resolved;
+		String test = testServer;
+		return test != null ? test : SERVER;
 	}
 
-	/** The server's address from its SRV record, or null when there is none. */
-	private static String lookup() throws Exception {
-		try {
-			return lookupWithSystemDns();
-		} catch (Throwable blocked) {
-			// Minecraft 1.8 to 1.13 bundles a library ("patchy") that takes over Java's naming lookups and
-			// can't reach the DNS provider on Java 17 and newer. The same record is then asked for over HTTPS.
-			return lookupOverHttps();
-		}
-	}
-
-	/** "priority weight port host", the way an SRV record's data is written. */
-	private static String address(String record) {
-		String[] parts = record.trim().split("\\s+");
-		if (parts.length < 4) return null;
-		int port = Integer.parseInt(parts[2]);
-		String host = parts[3].endsWith(".") ? parts[3].substring(0, parts[3].length() - 1) : parts[3];
-		return "http://" + host + ":" + port;
-	}
-
-	private static String lookupWithSystemDns() throws Exception {
-		java.util.Hashtable<String, String> env = new java.util.Hashtable<>();
-		env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
-		env.put("java.naming.provider.url", "dns:");
-		env.put("com.sun.jndi.dns.timeout.retries", "1");
-		javax.naming.directory.DirContext ctx = new javax.naming.directory.InitialDirContext(env);
-		try {
-			javax.naming.directory.Attribute srv = ctx.getAttributes(SRV_NAME, new String[]{"SRV"}).get("srv");
-			if (srv == null || srv.size() == 0) return null;
-			return address(srv.get(0).toString());
-		} finally {
-			ctx.close();
-		}
-	}
-
-	/** Public DNS-over-HTTPS resolvers that answer in JSON. Only the record's name is sent. */
-	private static final String[] HTTPS_RESOLVERS = {"https://cloudflare-dns.com/dns-query", "https://dns.google/resolve"};
-
-	private static String lookupOverHttps() throws Exception {
-		Exception last = null;
-		for (String resolver : HTTPS_RESOLVERS) {
-			try {
-				HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(resolver + "?name=" + SRV_NAME + "&type=SRV"))
-					.timeout(Duration.ofSeconds(6)).header("Accept", "application/dns-json").GET().build(), HttpResponse.BodyHandlers.ofString());
-				if (r.statusCode() != 200) continue;
-				JsonObject answer = new JsonParser().parse(r.body()).getAsJsonObject();
-				if (!answer.has("Answer") || !answer.get("Answer").isJsonArray()) return null;
-				for (JsonElement entry : answer.getAsJsonArray("Answer")) {
-					JsonObject record = entry.getAsJsonObject();
-					// 33 is the SRV record type.
-					if (record.has("type") && record.get("type").getAsInt() == 33 && record.has("data")) return address(record.get("data").getAsString());
-				}
-				return null;
-			} catch (Exception e) {
-				last = e;
+	/** Reads a reply as text, refusing one larger than {@link #MAX_REPLY} bytes. */
+	public static HttpResponse.BodyHandler<String> limited() {
+		return info -> HttpResponse.BodySubscribers.mapping(HttpResponse.BodySubscribers.ofInputStream(), in -> {
+			try (java.io.InputStream body = in) {
+				byte[] bytes = body.readNBytes(MAX_REPLY + 1);
+				if (bytes.length > MAX_REPLY) throw new java.io.IOException("The cosmetics server's reply was too large");
+				return new String(bytes, StandardCharsets.UTF_8);
+			} catch (java.io.IOException e) {
+				throw new java.io.UncheckedIOException(e);
 			}
+		});
+	}
+
+	/**
+	 * What the account tells Mojang it joined: SHA-1 of a fixed prefix, the server's challenge and a random
+	 * number of the client's own, as 40 hex digits. Signing the challenge as given would let whoever answers
+	 * it pass on the handshake value of a real Minecraft server they are joining under the player's name, and
+	 * Mojang would then let them into that server as the player. Nobody else can choose this value.
+	 */
+	static String signInId(String challenge, String client) {
+		try {
+			byte[] digest = java.security.MessageDigest.getInstance("SHA-1")
+				.digest((SIGN_IN_PREFIX + challenge + ":" + client).getBytes(StandardCharsets.UTF_8));
+			StringBuilder hex = new StringBuilder(40);
+			for (byte b : digest) hex.append(Character.forDigit((b >> 4) & 15, 16)).append(Character.forDigit(b & 15, 16));
+			return hex.toString();
+		} catch (java.security.NoSuchAlgorithmException e) {
+			throw new IllegalStateException(e);
 		}
-		if (last != null) throw last;
-		return null;
+	}
+
+	/** 32 random hex digits. */
+	private static String randomHex() {
+		byte[] bytes = new byte[16];
+		new java.security.SecureRandom().nextBytes(bytes);
+		StringBuilder hex = new StringBuilder(32);
+		for (byte b : bytes) hex.append(Character.forDigit((b >> 4) & 15, 16)).append(Character.forDigit(b & 15, 16));
+		return hex.toString();
 	}
 
 	/**
@@ -272,20 +237,27 @@ public final class CosmeticSync {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		Session user = mc.getSession();
 		HttpResponse<String> ch = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/auth/challenge")).timeout(Duration.ofSeconds(8)).GET().build(),
-			HttpResponse.BodyHandlers.ofString());
+			limited());
 		if (ch.statusCode() != 200) {
 			status = "Cosmetics server error (" + ch.statusCode() + ")";
 			return false;
 		}
 		String serverId = new JsonParser().parse(ch.body()).getAsJsonObject().get("serverId").getAsString();
+		// The server's challenges are 32 hex digits; anything else isn't one.
+		if (!serverId.matches("[0-9a-f]{32}")) {
+			status = "Cosmetics server error (sign-in)";
+			return false;
+		}
+		String client = randomHex();
+		String signed = signInId(serverId, client);
 		try {
-			mc.getSessionService().joinServer(user.getProfile(), user.getAccessToken(), serverId);
+			mc.getSessionService().joinServer(user.getProfile(), user.getAccessToken(), signed);
 		} catch (Exception e) {
 			status = "Couldn't sign in (offline account?): others can't see your cosmetics";
 			return false;
 		}
 		HttpResponse<String> v = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/auth/verify?name=" + URLEncoder.encode(user.getUsername(), StandardCharsets.UTF_8)
-			+ "&serverId=" + serverId)).timeout(Duration.ofSeconds(12)).POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+			+ "&serverId=" + serverId + "&client=" + client)).timeout(Duration.ofSeconds(12)).POST(HttpRequest.BodyPublishers.noBody()).build(), limited());
 		if (v.statusCode() != 200) {
 			status = "Cosmetics server refused sign-in (" + v.statusCode() + ")";
 			return false;
@@ -307,7 +279,7 @@ public final class CosmeticSync {
 				String body = CosmeticManager.own().toJson().toString();
 				HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/loadout")).timeout(Duration.ofSeconds(8))
 					.header("Authorization", "Bearer " + t).header("Content-Type", "application/json")
-					.PUT(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+					.PUT(HttpRequest.BodyPublishers.ofString(body)).build(), limited());
 				if (r.statusCode() == 401 && attempt == 0) {
 					invalidate(t);
 					continue;
@@ -348,7 +320,7 @@ public final class CosmeticSync {
 		checkingClaims = true;
 		try {
 			HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/shop/claims")).timeout(Duration.ofSeconds(8))
-				.header("Authorization", "Bearer " + session.token()).GET().build(), HttpResponse.BodyHandlers.ofString());
+				.header("Authorization", "Bearer " + session.token()).GET().build(), limited());
 			if (r.statusCode() == 401) {
 				invalidate(session.token());
 				status = "Sign in again to check cosmetic claims";
@@ -393,7 +365,7 @@ public final class CosmeticSync {
 				q.append(u);
 			}
 			HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/loadouts?uuids=" + q)).timeout(Duration.ofSeconds(8)).GET().build(),
-				HttpResponse.BodyHandlers.ofString());
+				limited());
 			if (r.statusCode() != 200) return;
 			JsonObject all = new JsonParser().parse(r.body()).getAsJsonObject();
 			MinecraftClient mc = MinecraftClient.getInstance();

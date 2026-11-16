@@ -24,7 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Talks to the cosmetics server (server/CosmeticsServer.java, found through DNS): signs you in the way
+ * Talks to the cosmetics server (server/CosmeticsServer.java, over HTTPS at {@link #SERVER}): signs you in the way
  * Minecraft servers do (Mojang joinServer, checked by the server with hasJoined), uploads your loadout
  * when it changes, and fetches the loadouts of players around you. 
  */
@@ -69,64 +69,68 @@ public final class CosmeticSync {
 	}
 
 	/**
-	 * Where the cosmetics server is comes from DNS, not from the mod: an SRV record on this name gives
-	 * its host and port (like Minecraft's _minecraft._tcp records), so the address can change without
-	 * a new build and isn't written in the jar. Not a setting.
+	 * The cosmetics and friends server. HTTPS only (Cloudflare is in front of it): over plain HTTP anyone on
+	 * the player's network could read friends' messages and the sign-in token, or swap the sign-in challenge.
 	 */
-	// Kept from the Eclipse Client days: the record and server didn't change with the rename.
-	private static final String SRV_NAME = "_eclipse-cosmetics._tcp.minearcade.org";
-	private static final long RESOLVE_MS = 30 * 60_000;
-	private static volatile String resolved;
-	private static volatile long resolvedAt;
-	private static volatile boolean resolving;
-	/** For tests only: use this server instead of looking it up. */
+	public static final String SERVER = "https://orbit-social.minearcade.org";
+	/** Fixed start of what is signed with Mojang; the server and Orbit Launcher use the same. */
+	private static final String SIGN_IN_PREFIX = "orbit-sign-in-v2:";
+	/** The largest reply taken from the server; a bigger one is refused instead of filling the game's memory. */
+	private static final int MAX_REPLY = 1 << 20;
+	/** For tests only: use this server instead. */
 	public static volatile String testServer;
 
-	/** Short status for the wardrobe, e.g. "Synced: other Orbit Client players see your cosmetics". */
+	/** Short status for the wardrobe. */
 	public static String status() {
-		if (server() == null) return resolving || resolvedAt == 0 ? "Connecting to the cosmetics server..." : "Cosmetics server unavailable: only you see these right now";
-		return status;
+		return status.isEmpty() ? "Connecting to the cosmetics server..." : status;
 	}
 
-	/** The cosmetics (and friends) server's address, or null while it isn't known. */
+	/** The cosmetics (and friends) server's address. */
 	public static String server() {
-		if (testServer != null) return testServer;
-		long now = System.currentTimeMillis();
-		if (!resolving && now - resolvedAt > (resolved == null ? 60_000 : RESOLVE_MS)) {
-			resolving = true;
-			CompletableFuture.runAsync(() -> {
-				try {
-					resolved = lookup();
-				} catch (Exception e) {
-					// Keep the last known address (or none) and try again later.
-				} finally {
-					resolvedAt = System.currentTimeMillis();
-					resolving = false;
-				}
-			}, WORKER);
-		}
-		return resolved;
+		String test = testServer;
+		return test != null ? test : SERVER;
 	}
 
-	/** Reads the SRV record: "priority weight port host". */
-	private static String lookup() throws Exception {
-		java.util.Hashtable<String, String> env = new java.util.Hashtable<>();
-		env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
-		env.put("java.naming.provider.url", "dns:");
-		env.put("com.sun.jndi.dns.timeout.retries", "1");
-		javax.naming.directory.DirContext ctx = new javax.naming.directory.InitialDirContext(env);
+	/** Reads a reply as text, refusing one larger than {@link #MAX_REPLY} bytes. */
+	public static HttpResponse.BodyHandler<String> limited() {
+		return info -> HttpResponse.BodySubscribers.mapping(HttpResponse.BodySubscribers.ofInputStream(), in -> {
+			try (java.io.InputStream body = in) {
+				byte[] bytes = body.readNBytes(MAX_REPLY + 1);
+				if (bytes.length > MAX_REPLY) throw new java.io.IOException("The cosmetics server's reply was too large");
+				return new String(bytes, StandardCharsets.UTF_8);
+			} catch (java.io.IOException e) {
+				throw new java.io.UncheckedIOException(e);
+			}
+		});
+	}
+
+	/**
+	 * What the account tells Mojang it joined: SHA-1 of a fixed prefix, the server's challenge and a random
+	 * number of the client's own, as 40 hex digits. Signing the challenge as given would let whoever answers
+	 * it pass on the handshake value of a real Minecraft server they are joining under the player's name, and
+	 * Mojang would then let them into that server as the player. Nobody else can choose this value.
+	 */
+	static String signInId(String challenge, String client) {
 		try {
-			javax.naming.directory.Attribute srv = ctx.getAttributes(SRV_NAME, new String[]{"SRV"}).get("srv");
-			if (srv == null || srv.size() == 0) return null;
-			String[] parts = srv.get(0).toString().trim().split("\\s+");
-			if (parts.length < 4) return null;
-			int port = Integer.parseInt(parts[2]);
-			String host = parts[3].endsWith(".") ? parts[3].substring(0, parts[3].length() - 1) : parts[3];
-			return "http://" + host + ":" + port;
-		} finally {
-			ctx.close();
+			byte[] digest = java.security.MessageDigest.getInstance("SHA-1")
+				.digest((SIGN_IN_PREFIX + challenge + ":" + client).getBytes(StandardCharsets.UTF_8));
+			StringBuilder hex = new StringBuilder(40);
+			for (byte b : digest) hex.append(Character.forDigit((b >> 4) & 15, 16)).append(Character.forDigit(b & 15, 16));
+			return hex.toString();
+		} catch (java.security.NoSuchAlgorithmException e) {
+			throw new IllegalStateException(e);
 		}
 	}
+
+	/** 32 random hex digits. */
+	private static String randomHex() {
+		byte[] bytes = new byte[16];
+		new java.security.SecureRandom().nextBytes(bytes);
+		StringBuilder hex = new StringBuilder(32);
+		for (byte b : bytes) hex.append(Character.forDigit((b >> 4) & 15, 16)).append(Character.forDigit(b & 15, 16));
+		return hex.toString();
+	}
+
 	/**
 	 * Ask the server for this account's claims on the next tick: opening the wardrobe, its Refresh
 	 * button, and signing in all call this. Website redemptions then show up without a restart.
@@ -232,20 +236,27 @@ public final class CosmeticSync {
 		Minecraft mc = Minecraft.getInstance();
 		var user = mc.getUser();
 		HttpResponse<String> ch = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/auth/challenge")).timeout(Duration.ofSeconds(8)).GET().build(),
-			HttpResponse.BodyHandlers.ofString());
+			limited());
 		if (ch.statusCode() != 200) {
 			status = "Cosmetics server error (" + ch.statusCode() + ")";
 			return false;
 		}
 		String serverId = JsonParser.parseString(ch.body()).getAsJsonObject().get("serverId").getAsString();
+		// The server's challenges are 32 hex digits; anything else isn't one.
+		if (!serverId.matches("[0-9a-f]{32}")) {
+			status = "Cosmetics server error (sign-in)";
+			return false;
+		}
+		String client = randomHex();
+		String signed = signInId(serverId, client);
 		try {
-			mc.services().sessionService().joinServer(user.getProfileId(), user.getAccessToken(), serverId);
+			mc.services().sessionService().joinServer(user.getProfileId(), user.getAccessToken(), signed);
 		} catch (Exception e) {
 			status = "Couldn't sign in (offline account?): others can't see your cosmetics";
 			return false;
 		}
 		HttpResponse<String> v = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/auth/verify?name=" + URLEncoder.encode(user.getName(), StandardCharsets.UTF_8)
-			+ "&serverId=" + serverId)).timeout(Duration.ofSeconds(12)).POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+			+ "&serverId=" + serverId + "&client=" + client)).timeout(Duration.ofSeconds(12)).POST(HttpRequest.BodyPublishers.noBody()).build(), limited());
 		if (v.statusCode() != 200) {
 			status = "Cosmetics server refused sign-in (" + v.statusCode() + ")";
 			return false;
@@ -272,7 +283,7 @@ public final class CosmeticSync {
 				String body = CosmeticManager.own().toJson().toString();
 				HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/loadout")).timeout(Duration.ofSeconds(8))
 					.header("Authorization", "Bearer " + t).header("Content-Type", "application/json")
-					.PUT(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+					.PUT(HttpRequest.BodyPublishers.ofString(body)).build(), limited());
 				if (r.statusCode() == 401 && attempt == 0) {
 					invalidate(t);
 					continue;
@@ -313,7 +324,7 @@ public final class CosmeticSync {
 		checkingClaims = true;
 		try {
 			HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/shop/claims")).timeout(Duration.ofSeconds(8))
-				.header("Authorization", "Bearer " + session.token()).GET().build(), HttpResponse.BodyHandlers.ofString());
+				.header("Authorization", "Bearer " + session.token()).GET().build(), limited());
 			if (r.statusCode() == 401) {
 				invalidate(session.token());
 				status = "Sign in again to check cosmetic claims";
@@ -357,7 +368,7 @@ public final class CosmeticSync {
 				q.append(u);
 			}
 			HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(server + "/loadouts?uuids=" + q)).timeout(Duration.ofSeconds(8)).GET().build(),
-				HttpResponse.BodyHandlers.ofString());
+				limited());
 			if (r.statusCode() != 200) return;
 			JsonObject all = JsonParser.parseString(r.body()).getAsJsonObject();
 			Minecraft mc = Minecraft.getInstance();
