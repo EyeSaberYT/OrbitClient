@@ -162,6 +162,8 @@ public final class WardrobeView {
 		int y = dy + 19;
 		if (!CosmeticManager.ownershipLoaded()) {
 			y = lines("Checking what this account owns...", dx + 6, y, 0xFF8A8F9C);
+		} else if (!CosmeticManager.owns(c.id) && c.adventDay > 0) {
+			y = lines("Limited edition. Only on December " + c.adventDay + ", from the advent calendar in Orbit Launcher.", dx + 6, y, 0xFFE0A458);
 		} else if (!CosmeticManager.owns(c.id)) {
 			y = lines("Not owned. Get it at orbit.minearcade.org/cosmetics, then press Refresh.", dx + 6, y, 0xFFE0A458);
 		} else {

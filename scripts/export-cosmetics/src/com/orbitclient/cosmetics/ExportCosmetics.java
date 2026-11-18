@@ -41,11 +41,12 @@ public final class ExportCosmetics {
 		"wisp", "cube_buddy", "moss_frog", "ember_drake");
 
 	public static void main(String[] args) throws IOException {
-		File website = null, sheets = null, capes = new File("src/main/resources/assets/orbitclient/textures/cosmetics/capes");
+		File website = null, sheets = null, advent = null, capes = new File("src/main/resources/assets/orbitclient/textures/cosmetics/capes");
 		for (int i = 0; i + 1 < args.length; i += 2) {
 			switch (args[i]) {
 				case "--website" -> website = new File(args[i + 1]);
 				case "--sheets" -> sheets = new File(args[i + 1]);
+				case "--advent" -> advent = new File(args[i + 1]);
 				case "--capes" -> capes = new File(args[i + 1]);
 				default -> throw new IllegalArgumentException("Unknown option " + args[i]);
 			}
@@ -54,6 +55,14 @@ public final class ExportCosmetics {
 		List<BufferedImage> pictures = new ArrayList<>();
 		for (Cosmetic c : all) pictures.add(picture(c, capes));
 
+		if (advent != null) {
+			// The advent calendar's pictures for Orbit Launcher (src/assets/festive/advent/<id>.png there).
+			advent.mkdirs();
+			for (int i = 0; i < all.size(); i++) {
+				if (all.get(i).adventDay > 0) ImageIO.write(pictures.get(i), "png", new File(advent, all.get(i).id + ".png"));
+			}
+		}
+
 		if (website != null) {
 			File img = new File(website, "img/cosmetics"), data = new File(website, "data");
 			img.mkdirs();
@@ -61,6 +70,9 @@ public final class ExportCosmetics {
 			JsonArray list = new JsonArray();
 			for (int i = 0; i < all.size(); i++) {
 				Cosmetic c = all.get(i);
+				// Advent calendar cosmetics are limited editions claimed in Orbit Launcher on their day only, never
+				// listed (or offered) on the website. Their pictures go to --advent for the launcher instead.
+				if (c.adventDay > 0) continue;
 				ImageIO.write(pictures.get(i), "png", new File(img, c.id + ".png"));
 				JsonObject o = new JsonObject();
 				o.addProperty("id", c.id);

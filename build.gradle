@@ -60,7 +60,7 @@ fabricApi {
 if (stonecutter.current.active) {
 sourceSets {
 	exportCosmetics {
-		java.srcDir 'scripts/export-cosmetics/src'
+		java.srcDir rootProject.file('scripts/export-cosmetics/src')
 		compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
 		runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
 	}
@@ -70,11 +70,14 @@ tasks.register('exportCosmetics', JavaExec) {
 	description = 'Exports cosmetic pictures and data for the website (-Pwebsite=<public dir>) and contact sheets (-Psheets=<dir>).'
 	classpath = sourceSets.exportCosmetics.runtimeClasspath
 	mainClass = 'com.orbitclient.cosmetics.ExportCosmetics'
+	workingDir = rootProject.projectDir
 	systemProperty 'java.awt.headless', 'true'
 	def website = providers.gradleProperty('website').getOrNull()
 	def sheets = providers.gradleProperty('sheets').getOrNull()
+	def advent = providers.gradleProperty('advent').getOrNull()
 	if (website != null) args '--website', website
 	if (sheets != null) args '--sheets', sheets
+	if (advent != null) args '--advent', advent
 }
 }
 

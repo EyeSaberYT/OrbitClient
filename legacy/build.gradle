@@ -33,7 +33,7 @@ dependencies {
 // The cosmetic art (every hat, wing, pet, ...) and the ownership rules are the main client's own files:
 // copied in at build time with the few engine classes they name pointed at this client's stand-ins
 // (com.orbitclient.legacy.gl). Nothing here is a second copy to keep in step.
-def sharedCosmetics = ['Hats', 'Backs', 'Auras', 'Pets', 'Wings', 'Faces', 'Capes', 'Cosmetics', 'CosmeticSlot',
+def sharedCosmetics = ['Hats', 'Backs', 'Auras', 'Pets', 'Wings', 'Faces', 'Capes', 'Advent', 'Cosmetics', 'CosmeticSlot',
 	'VoxelModel', 'ClaimsResponse', 'AccountOutfits']
 def sharedDir = layout.buildDirectory.dir('generated/shared')
 def syncShared = tasks.register('syncShared', Copy) {

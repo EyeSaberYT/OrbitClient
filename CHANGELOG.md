@@ -5,6 +5,20 @@ onto the GitHub release page (and the Discord announcement), so write it for pla
 will notice, then what was fixed, with the Minecraft versions it affects. A release without a
 section here does not build.
 
+## v1.1.8
+
+**The Christmas advent calendar: 24 limited-edition cosmetics, one for every day from December 1st to 24th.**
+
+- Open each day's door in the advent calendar on Orbit Launcher's Play page to claim that day's cosmetic.
+  Each one can only be claimed on its own day, so they really are limited editions.
+- The 24: Santa Hat, Candy Cane, Snowflake Halo, Gingerbread Buddy, Reindeer Nose, Holly Crown, Gift
+  Backpack, Wreath, Tree Topper, Mini Snowman, Snow Goggles, Stocking, Bauble, Reindeer Antlers,
+  Peppermint Orbit, Ice Crown, Frost Wings, Festive Cape, North Star, Knitted Scarf, Cookie Crumbs, Elf
+  Hat, Snow Globe and the Christmas Star Aura on Christmas Eve.
+- Claimed ones appear in your wardrobe (press Refresh). Ones you don't have yet tell you which December
+  day they belong to.
+- On every Minecraft version Orbit Client supports, 1.8.9 to 26.3.
+
 ## v1.1.7
 
 **Security fix for cosmetics and friends sign-in, on every Minecraft version. Please update.**

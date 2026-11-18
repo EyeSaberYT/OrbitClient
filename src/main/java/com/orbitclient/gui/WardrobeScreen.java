@@ -429,9 +429,11 @@ public class WardrobeScreen extends Screen {
 			UiText.spacedSmall(g, chip, x + w / 2f, top + 92, accent, true, 0.55f);
 
 			if (!CosmeticManager.owns(focus.id)) {
-				String message = CosmeticManager.ownershipLoaded()
-					? "Get this free cosmetic at orbit.minearcade.org/cosmetics, then press Refresh. It's added to your account; nothing equips automatically."
-					: "Checking your account's claims… Connect to the cosmetics server to unlock claimed items.";
+				String message = !CosmeticManager.ownershipLoaded()
+					? "Checking your account's claims… Connect to the cosmetics server to unlock claimed items."
+					: focus.adventDay > 0
+					? "Limited edition. Only on December " + focus.adventDay + ": open that day's door in the advent calendar in Orbit Launcher, then press Refresh."
+					: "Get this free cosmetic at orbit.minearcade.org/cosmetics, then press Refresh. It's added to your account; nothing equips automatically.";
 				List<String> lines = UiText.wrap(message, w - 24, 5);
 				for (int i = 0; i < lines.size(); i++) UiText.text(g, lines.get(i), x + 12, top + 108 + i * 10, Theme.O_TEXT_DIM);
 			} else {

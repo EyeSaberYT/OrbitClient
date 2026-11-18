@@ -60,6 +60,8 @@ public final class Cosmetic {
 	float nameLift;
 	/** Whether it moves (capes animate, wings flap, pets bob); false for cosmetics that just sit still. */
 	boolean animated = true;
+	/** Limited edition from the advent calendar: the December day it can be claimed (1 to 24), else 0. */
+	public int adventDay;
 
 	Cosmetic(String id, String name, CosmeticSlot slot, int defaultColor, boolean colorable, Renderer renderer, int capeFrames) {
 		this.id = id;

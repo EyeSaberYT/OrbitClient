@@ -47,6 +47,7 @@ public final class Cosmetics {
 		Wings.register();
 		Auras.register();
 		Pets.register();
+		Advent.register();
 	}
 
 	// ---------------------------------------------------------------- registering
@@ -61,6 +62,11 @@ public final class Cosmetics {
 		Cosmetic c = BY_ID.get(id);
 		c.iconModel = model;
 		c.iconPair = pair;
+	}
+
+	/** Marks a limited-edition cosmetic from the advent calendar, claimable only on December {@code day}. */
+	static void advent(String id, int day) {
+		BY_ID.get(id).adventDay = day;
 	}
 
 	/** Marks a cosmetic that just sits still (for listings). */

@@ -44,6 +44,7 @@ public class CosmeticGenerator {
 			new Cape("hive", CosmeticGenerator::hive, 0xFF2A1A06, 0xFF8A5A12),
 			new Cape("regal", CosmeticGenerator::regal, 0xFF1A0612, 0xFFC9963A),
 			new Cape("plasma", CosmeticGenerator::plasma, 0xFF0E0618, 0xFF3A1460),
+			new Cape("xmas_festive_cape", CosmeticGenerator::festive, 0xFF3A0A0E, 0xFFF4F6FA),
 		};
 		BufferedImage preview = new BufferedImage(capes.length * (DW * 3 + 12), 4 * (DH * 3 + 12), BufferedImage.TYPE_INT_ARGB);
 		for (int ci = 0; ci < capes.length; ci++) {
@@ -321,6 +322,36 @@ public class CosmeticGenerator {
 			double blink = Math.max(0, Math.sin(ph * (1 + i % 2) + i * 2.3));
 			double d = Math.hypot((u - fu) * 10, (v - fv) * 16);
 			c = mix(c, 0xFFE6FF7A, clamp(blink * (1.2 - d * 1.4)));
+		}
+		return c;
+	}
+
+	/** Advent calendar, December 18th: red velvet, white fur trim, a gold star and snow drifting down. */
+	static int festive(double u, double v, double t) {
+		// Velvet: deep red with a soft sheen moving across it.
+		int c = gradient(v, 0xFFC4202A, 0xFF7A0E16);
+		double sheen = Math.max(0, Math.sin((u * 2 + v * 3 - t * 2) * Math.PI)) * 0.12 * (0.6 + fbm(u * 5, v * 8, 3));
+		c = mix(c, 0xFFFF6A6A, sheen);
+		// Fur trim along the bottom and the sides.
+		double fur = fbm(u * 18, v * 30, 3);
+		if (v > 0.86 - fur * 0.05 || u < 0.07 + fur * 0.03 || u > 0.93 - fur * 0.03) return mix(0xFFF4F6FA, 0xFFC9D6E2, fur * 0.6);
+		// A gold star near the top, twinkling.
+		double x = (u - 0.5) * 10, y = (v - 0.2) * 16;
+		double r = Math.hypot(x, y), a = Math.atan2(y, x) + Math.PI / 2;
+		double edge = 1.0 + 1.5 * Math.pow(Math.abs(Math.cos(a * 2.5)), 3);
+		if (r < edge) return mix(0xFFF2C14E, 0xFFFFF4C2, clamp(0.4 + 0.4 * Math.sin(t * Math.PI * 2) - r * 0.2));
+		// Holly sprigs in the lower corners.
+		for (int side = 0; side < 2; side++) {
+			double hx = (u - (side == 0 ? 0.2 : 0.8)) * 10, hy = (v - 0.76) * 16;
+			if (Math.hypot(hx, hy) < 0.5) return 0xFFE5303A;
+			if (Math.hypot(hx - 0.8, hy + 0.3) < 0.75 || Math.hypot(hx + 0.8, hy + 0.3) < 0.75) return 0xFF2E8B3E;
+		}
+		// Snow drifting down, looping with the animation.
+		for (int i = 0; i < 12; i++) {
+			double pv = (hash(i * 3.7) + t) % 1.0;
+			double pu = hash(i * 9.1) + 0.03 * Math.sin((t + i) * Math.PI * 2);
+			double d = Math.hypot((u - pu) * 10, (v - pv) * 16);
+			if (d < 0.45) c = mix(c, 0xFFFFFFFF, clamp(1.2 - d * 2));
 		}
 		return c;
 	}

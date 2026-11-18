@@ -25,7 +25,7 @@ dependencies {
 }
 
 // The cosmetic art and the ownership rules are the main client's own files, as in ../legacy.
-def sharedCosmetics = ['Hats', 'Backs', 'Auras', 'Pets', 'Wings', 'Faces', 'Capes', 'Cosmetics', 'CosmeticSlot',
+def sharedCosmetics = ['Hats', 'Backs', 'Auras', 'Pets', 'Wings', 'Faces', 'Capes', 'Advent', 'Cosmetics', 'CosmeticSlot',
 	'VoxelModel', 'ClaimsResponse', 'AccountOutfits']
 def sharedDir = layout.buildDirectory.dir('generated/shared')
 def syncShared = tasks.register('syncShared', Copy) {
