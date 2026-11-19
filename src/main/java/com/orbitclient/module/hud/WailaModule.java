@@ -1,5 +1,6 @@
 package com.orbitclient.module.hud;
 
+import com.orbitclient.util.ItemStacks;
 import com.orbitclient.util.Render2D;
 import com.orbitclient.module.HudModule;
 import com.orbitclient.setting.BooleanSetting;
@@ -53,7 +54,7 @@ public class WailaModule extends HudModule {
 		if (showEntities.isOn() && hit instanceof EntityHitResult ehr) {
 			return new Object[]{ehr.getEntity().getName().getString(), null};
 		}
-		return editing ? new Object[]{"Grass Block", new ItemStack(Items.GRASS_BLOCK)} : null;
+		return editing ? new Object[]{"Grass Block", ItemStacks.of(Items.GRASS_BLOCK)} : null;
 	}
 
 	@Override

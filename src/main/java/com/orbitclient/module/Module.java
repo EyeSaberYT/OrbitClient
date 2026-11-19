@@ -1,5 +1,6 @@
 package com.orbitclient.module;
 
+import com.orbitclient.util.ItemStacks;
 import com.orbitclient.setting.KeybindSetting;
 import com.orbitclient.setting.Setting;
 import net.minecraft.client.Minecraft;
@@ -60,8 +61,11 @@ public abstract class Module {
 	}
 
 	public ItemStack getIcon() {
-		if (iconStack == null) iconStack = new ItemStack(icon);
-		return iconStack;
+		if (iconStack != null) return iconStack;
+		ItemStack stack = ItemStacks.of(icon);
+		// Not cached while empty: on 26.2+ items can't be made until a world has loaded.
+		if (!stack.isEmpty()) iconStack = stack;
+		return stack;
 	}
 
 	public boolean isNew() {

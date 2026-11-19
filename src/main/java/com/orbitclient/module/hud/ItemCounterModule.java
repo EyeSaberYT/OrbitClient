@@ -1,5 +1,6 @@
 package com.orbitclient.module.hud;
 
+import com.orbitclient.util.ItemStacks;
 import com.orbitclient.util.Render2D;
 import com.orbitclient.module.HudModule;
 import com.orbitclient.setting.BooleanSetting;
@@ -63,7 +64,7 @@ public class ItemCounterModule extends HudModule {
 	public void render(GuiGraphics graphics, boolean editing) {
 		int y = 0;
 		for (Object[] row : rows(editing)) {
-			graphics.renderItem(new ItemStack((Item) row[0]), 0, y);
+			graphics.renderItem(ItemStacks.of((Item) row[0]), 0, y);
 			Render2D.text(graphics, mc.font, String.valueOf(row[1]), 19, y + 4, textColor.getColor(), true);
 			y += 17;
 		}

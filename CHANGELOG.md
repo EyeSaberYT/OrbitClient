@@ -5,6 +5,15 @@ onto the GitHub release page (and the Discord announcement), so write it for pla
 will notice, then what was fixed, with the Minecraft versions it affects. A release without a
 section here does not build.
 
+## v1.1.9
+
+**Fixes a crash in Edit HUD on Minecraft 26.2 and newer.**
+
+- Opening Edit HUD from the main menu (before joining a world) no longer crashes the game. The Armor
+  Status, Item Counter and Waila example items now appear once you have joined a world.
+- Mod icons in the Orbit menu can no longer crash the game on the main menu for the same reason.
+- Affects Minecraft 26.2 and 26.3; other versions only get the safer code.
+
 ## v1.1.8
 
 **The Christmas advent calendar: 24 limited-edition cosmetics, one for every day from December 1st to 24th.**

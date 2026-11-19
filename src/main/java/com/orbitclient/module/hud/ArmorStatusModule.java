@@ -1,5 +1,6 @@
 package com.orbitclient.module.hud;
 
+import com.orbitclient.util.ItemStacks;
 import com.orbitclient.util.Render2D;
 import com.orbitclient.module.HudModule;
 import com.orbitclient.setting.BooleanSetting;
@@ -31,13 +32,14 @@ public class ArmorStatusModule extends HudModule {
 	}
 
 	private static ItemStack[] preview() {
-		if (preview == null) {
-			preview = new ItemStack[]{
-				new ItemStack(Items.DIAMOND_HELMET), new ItemStack(Items.DIAMOND_CHESTPLATE),
-				new ItemStack(Items.DIAMOND_LEGGINGS), new ItemStack(Items.DIAMOND_BOOTS), new ItemStack(Items.DIAMOND_SWORD)
-			};
-		}
-		return preview;
+		if (preview != null) return preview;
+		ItemStack[] stacks = {
+			ItemStacks.of(Items.DIAMOND_HELMET), ItemStacks.of(Items.DIAMOND_CHESTPLATE),
+			ItemStacks.of(Items.DIAMOND_LEGGINGS), ItemStacks.of(Items.DIAMOND_BOOTS), ItemStacks.of(Items.DIAMOND_SWORD)
+		};
+		// Before a world has loaded (26.2+) the items can't be made yet; try again next time instead of keeping blanks.
+		for (ItemStack stack : stacks) if (stack.isEmpty()) return stacks;
+		return preview = stacks;
 	}
 
 	private List<ItemStack> items(boolean editing) {
