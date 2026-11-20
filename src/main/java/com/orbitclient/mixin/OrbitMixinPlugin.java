@@ -39,6 +39,9 @@ public class OrbitMixinPlugin implements IMixinConfigPlugin {
 		//? if >=1.15.2 {
 		mixins.add("WindowTitleMixin");
 		//?}
+		//? if <26.3 {
+		mixins.add("WindowMixin");
+		//?}
 		//? if <1.16.1 {
 		/*mixins.add("PlayerRendererLayerMixin");
 		mixins.add("OwnEventsMixin");

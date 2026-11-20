@@ -69,6 +69,7 @@ public final class ModuleManager {
 		register(DebugToggleModule.hitbox());
 		//? if >=1.21.2
 		register(new MotionBlurModule());
+		register(new BorderlessFullscreenModule());
 		register(new BlockOutlineModule());
 		register(new HitColorModule());
 		register(new NametagsModule());

@@ -5,6 +5,17 @@ onto the GitHub release page (and the Discord announcement), so write it for pla
 will notice, then what was fixed, with the Minecraft versions it affects. A release without a
 section here does not build.
 
+## v1.1.10
+
+**Borderless Fullscreen, like Lunar's.**
+
+- New mod in the Right Shift menu (Mechanic): **Borderless Fullscreen**. With it on, fullscreen (F11 or
+  Video Settings) becomes a borderless window covering your screen instead of exclusive fullscreen, so
+  Alt+Tab and a second monitor switch instantly, with no black flash and no getting stuck in the game.
+- F11 still switches back to a normal window, and turning the mod off goes back to normal fullscreen.
+- On Minecraft 1.15 to 26.3 (on 26.3 it switches on the game's own borderless mode). macOS keeps its own
+  fullscreen, which already works this way. Not on 1.8.9 to 1.13.2 yet.
+
 ## v1.1.9
 
 **Fixes a crash in Edit HUD on Minecraft 26.2 and newer.**
